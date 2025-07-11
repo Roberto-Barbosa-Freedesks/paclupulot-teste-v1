@@ -1,0 +1,1634 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Pac-Lúpulo da Cervejaria CAMPINAS</title>
+    <meta name="description" content="Jogue Pac-Lúpulo, o jogo oficial da Cervejaria Campinas! Colete lúpulos, evite os fantasmas e conquiste o ranking cervejeiro." />
+    <meta name="keywords" content="pac-man, cervejaria campinas, jogo, lúpulo, cerveja, ranking" />
+    <meta name="author" content="Cervejaria Campinas" />
+    
+    <!-- Performance and Mobile Optimization -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f5d922" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    
+    <!-- Preconnect to external resources -->
+    <link rel="preconnect" href="https://www.gstatic.com" />
+    <link rel="preconnect" href="https://servicodados.ibge.gov.br" />
+    
+    <!-- Icons and Manifest -->
+    <link rel="apple-touch-icon-precomposed" href="icon/ios_icon.png" />
+    <link rel="icon" type="image/png" href="icon/favicon.png" />
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="font/ARCADE_R.TTF" as="font" type="font/ttf" crossorigin />
+    <link rel="preload" href="img/capa.jpg" as="image" />
+    <link rel="preload" href="sounds/coffee-break-music.mp3" as="audio" />
+
+    <style>
+      /* Reset and Base Styles */
+      * {
+        box-sizing: border-box;
+      }
+      
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        font-family: var(--primary-font);
+        overflow: hidden;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      
+      /* 🎮 FONTE ARCADE PERFEITA - Press Start 2P */
+      /* Escolhida pela equipe de especialistas para máximo impacto visual */
+      @font-face {
+        font-family: 'PressStart2P';
+        src: url('font/PressStart2P.ttf') format('truetype');
+        font-display: swap;
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD, U+00C0-00FF;
+      }
+      
+      /* Font stack otimizado para jogos arcade/retro */
+      :root {
+        --primary-font: 'PressStart2P', 'Courier New', 'Monaco', 'Consolas', monospace;
+        --fallback-font: 'PressStart2P', monospace;
+      }
+      
+      /* 🎨 Renderização otimizada para Press Start 2P */
+      * {
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        font-variant-ligatures: none;
+      }
+      
+      /* 🎮 Garantia de Press Start 2P para todos os textos arcade */
+      body, h1, h2, h3, .title, .menu-title, .accent-text {
+        font-family: var(--primary-font) !important;
+        font-weight: normal; /* Press Start 2P é naturalmente bold */
+        letter-spacing: 1px; /* Espaçamento arcade clássico */
+      }
+      
+      /* 🌟 Otimizações de contraste e legibilidade para Press Start 2P */
+      .arcade-text {
+        text-shadow: 
+          -1px -1px 0 #000,
+          1px -1px 0 #000,
+          -1px 1px 0 #000,
+          1px 1px 0 #000,
+          0 0 5px rgba(245, 217, 34, 0.3);
+        color: #f5d922;
+      }
+      
+      /* Títulos principais com máximo impacto visual */
+      .main-title {
+        font-size: clamp(18px, 5vw, 32px);
+        text-shadow: 
+          -2px -2px 0 #000,
+          2px -2px 0 #000,
+          -2px 2px 0 #000,
+          2px 2px 0 #000,
+          0 0 10px rgba(245, 217, 34, 0.5);
+        color: #f5d922;
+        letter-spacing: 2px;
+      }
+      
+      /* Canvas Warning */
+      #canvas-warning {
+        color: #ff0;
+        font-size: 1.5em;
+        text-align: center;
+        padding: 20px;
+      }
+
+      /* Animations */
+      @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
+      }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+      }
+      
+      /* Loading Spinner */
+      .loading-spinner {
+        border: 3px solid #333;
+        border-top: 3px solid #f5d922;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        animation: spin 1s linear infinite;
+        margin: 10px auto;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      /* Button Styles */
+      .btn {
+        padding: 12px 24px;
+        margin: 8px;
+        background: linear-gradient(145deg, #f5d922, #e6c41d);
+        color: #000;
+        border: none;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        text-transform: uppercase;
+      }
+      
+      .btn:hover {
+        background: linear-gradient(145deg, #e6c41d, #d4b01a);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+      }
+      
+      .btn:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      }
+      
+      /* Input Styles */
+      .form-input {
+        display: block;
+        width: 100%;
+        margin: 10px 0;
+        padding: 12px;
+        border: 2px solid #333;
+        border-radius: 6px;
+        background: #222;
+        color: #fff;
+        font-family: inherit;
+        font-size: 14px;
+        transition: border-color 0.3s ease;
+      }
+      
+      .form-input:focus {
+        outline: none;
+        border-color: #f5d922;
+        box-shadow: 0 0 0 2px rgba(245, 217, 34, 0.2);
+      }
+      
+      .form-input::placeholder {
+        color: #888;
+      }
+      
+      /* Top Buttons */
+      #pontos-button, #logout-button {
+        position: fixed;
+        top: 15px;
+        z-index: 2001;
+        padding: 10px 20px;
+        font-size: 12px;
+        font-family: inherit;
+        background: rgba(34, 34, 34, 0.95);
+        color: #fff;
+        border: 2px solid #f5d922;
+        border-radius: 8px;
+        cursor: pointer;
+        backdrop-filter: blur(5px);
+        transition: all 0.3s ease;
+      }
+      
+      #pontos-button { right: 120px; }
+      #logout-button { right: 15px; }
+      
+      #pontos-button:hover, #logout-button:hover {
+        background: rgba(245, 217, 34, 0.2);
+        transform: translateY(-2px);
+      }
+      
+      /* Responsive Design */
+      @media (max-width: 768px) {
+        body {
+          font-size: 14px;
+        }
+        
+        #pontos-button, #logout-button {
+          font-size: 10px;
+          padding: 8px 12px;
+          top: 10px;
+        }
+        
+        #pontos-button { right: 80px; }
+        #logout-button { right: 10px; }
+        
+        .btn {
+          padding: 10px 20px;
+          font-size: 12px;
+        }
+        
+        .form-input {
+          padding: 10px;
+          font-size: 12px;
+        }
+        
+        /* Melhor experiência em telas pequenas */
+        #auth-screen > div {
+          max-width: 350px;
+          padding: 30px 20px;
+        }
+        
+        #pontos-screen > div {
+          max-width: 350px;
+          padding: 20px 15px;
+        }
+        
+        /* Canvas responsivo */
+        #canvas {
+          max-width: 100vw;
+          max-height: 70vh;
+          object-fit: contain;
+        }
+        
+        /* Ajustes para notificações mobile */
+        #notification-container {
+          top: 60px;
+          right: 10px;
+          left: 10px;
+          max-width: none;
+        }
+        
+        /* Melhoria na grid de pontos */
+        #pontos-screen .grid {
+          grid-template-columns: 1fr;
+          gap: 15px;
+        }
+      }
+      
+      @media (max-width: 480px) {
+        #start-wrapper {
+          width: 95vw;
+        }
+        
+        #start-text {
+          font-size: clamp(14px, 3.5vw, 20px);
+        }
+        
+        #auth-screen > div,
+        #pontos-screen > div {
+          width: 95%;
+          padding: 20px 15px;
+        }
+        
+        .btn {
+          padding: 8px 16px;
+          font-size: 11px;
+        }
+        
+        .form-input {
+          padding: 8px;
+          font-size: 11px;
+        }
+        
+        /* Botões de controle menores em telas muito pequenas */
+        #pontos-button, #logout-button {
+          font-size: 9px;
+          padding: 6px 10px;
+        }
+      }
+      
+      /* Orientação landscape em mobile */
+      @media (max-width: 768px) and (orientation: landscape) {
+        #canvas {
+          max-height: 85vh;
+        }
+        
+        #pontos-button, #logout-button {
+          top: 5px;
+        }
+        
+        #notification-container {
+          top: 40px;
+        }
+      }
+      
+      /* Melhorias para touch */
+      @media (hover: none) and (pointer: coarse) {
+        .btn, .form-input, #pontos-button, #logout-button {
+          min-height: 44px; /* Tamanho mínimo recomendado para touch */
+        }
+        
+        .btn:active {
+          transform: scale(0.95);
+        }
+        
+        /* Remove hover effects em dispositivos touch */
+        .btn:hover {
+          transform: none;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+      }
+      
+      /* Accessibility */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+      
+      /* High contrast mode */
+      @media (prefers-contrast: high) {
+        .btn {
+          border: 2px solid #fff;
+        }
+        
+        .form-input {
+          border: 2px solid #fff;
+        }
+      }
+    </style>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-functions-compat.js"></script>
+
+    <script>
+      // Configuração do Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyDg_PZ01MsdfWK8dlVKO78T_L8IRQTN6Pw",
+        authDomain: "cervejariacampinas-paclupulo.firebaseapp.com",
+        projectId: "cervejariacampinas-paclupulo",
+        storageBucket: "cervejariacampinas-paclupulo.appspot.com",
+        messagingSenderId: "530428991490",
+        appId: "1:530428991490:web:eb107a3bae413d6fdf2f1b",
+        measurementId: "G-CBG0XB27WQ",
+      };
+      firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+      const db = firebase.firestore();
+      const functions = firebase.functions();
+
+      // Habilita o “modo lembrar usuário” (persistence LOCAL)
+      firebase
+        .auth()
+        .setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+        .then(() => console.log("Persistência LOCAL ativada"))
+        .catch((err) =>
+          console.error("Erro ao definir persistência:", err.message),
+        );
+    </script>
+
+    <!-- ======= SCRIPT PARA PREENCHER ESTADOS E CIDADES (IBGE) ======= -->
+    <script>
+      // 1) Função para carregar estados do IBGE
+      function carregarEstados() {
+        fetch("https://servicodados.ibge.gov.br/api/v1/localidades/estados")
+          .then((response) => response.json())
+          .then((estados) => {
+            estados.sort((a, b) => (a.sigla > b.sigla ? 1 : -1));
+            const selectEstado = document.getElementById("register-state");
+            // Limpa qualquer <option> pré-existente (exceto o placeholder)
+            selectEstado
+              .querySelectorAll('option:not([value=""])')
+              .forEach((opt) => opt.remove());
+            estados.forEach((estado) => {
+              const opt = document.createElement("option");
+              opt.value = estado.sigla; // ex: "SP"
+              opt.textContent = `${estado.sigla} - ${estado.nome}`; // ex: "SP - São Paulo"
+              opt.setAttribute("data-id", estado.id); // ID IBGE necessário para buscar municípios
+              selectEstado.appendChild(opt);
+            });
+          })
+          .catch((err) => {
+            console.error("Erro ao carregar estados:", err);
+          });
+      }
+
+      // 2) Função para carregar cidades de um estado selecionado
+      function carregarCidades(ufId) {
+        const datalistCidade = document.getElementById("register-city-list");
+        datalistCidade.innerHTML = ""; // Limpa opções anteriores
+        if (!ufId) return;
+        fetch(
+          `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${ufId}/municipios`,
+        )
+          .then((response) => response.json())
+          .then((cidades) => {
+            cidades.sort((a, b) => (a.nome > b.nome ? 1 : -1));
+            cidades.forEach((cidade) => {
+              const opt = document.createElement("option");
+              opt.value = cidade.nome; // ex: "Campinas"
+              datalistCidade.appendChild(opt);
+            });
+          })
+          .catch((err) => {
+            console.error("Erro ao carregar cidades:", err);
+          });
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        // Carrega listagem de estados ao carregar a página
+        carregarEstados();
+        // Quando o usuário muda o estado, carrega as cidades correspondentes
+        const selectEstado = document.getElementById("register-state");
+        if (selectEstado) {
+          selectEstado.addEventListener("change", function () {
+            const idx = selectEstado.selectedIndex;
+            const optSelecionada = selectEstado.options[idx];
+            const ufId = optSelecionada.getAttribute("data-id");
+            carregarCidades(ufId);
+          });
+        }
+      });
+    </script>
+  </head>
+
+  <body>
+    <!-- Fonte custom para a classe ArcadeR -->
+    <div style="font-family: &quot;ArcadeR&quot;"></div>
+
+    <!-- ========== ÁUDIO DE FUNDO (loop) ========== -->
+    <audio id="bg-music" src="sounds/coffee-break-music.mp3" loop></audio>
+    <!-- =============================================== -->
+
+    <!-- ========== TELA START ========== -->
+    <div
+      id="start-screen"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #000 0%, #111 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1002;
+        animation: fadeIn 0.5s ease-out;
+      "
+    >
+      <div
+        id="start-wrapper"
+        style="
+          position: relative; 
+          width: 90vw; 
+          max-width: 448px;
+          animation: pulse 2s ease-in-out infinite;
+        "
+      >
+        <img
+          src="img/capa.jpg"
+          alt="Pac-Lúpulo da Cervejaria Campinas"
+          style="
+            display: block; 
+            width: 100%; 
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(245, 217, 34, 0.3);
+          "
+          loading="eager"
+        />
+        <p
+          id="start-text"
+          style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            margin: 0;
+            font-family: var(--primary-font);
+            font-size: clamp(16px, 4vw, 24px);
+            color: #f5d922;
+            text-shadow:
+              -2px -2px 0 #000,
+              2px -2px 0 #000,
+              -2px 2px 0 #000,
+              2px 2px 0 #000,
+              0 0 10px rgba(245, 217, 34, 0.5);
+            animation: blink 1s steps(1) infinite;
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+          "
+        >
+          TOQUE PARA JOGAR
+        </p>
+      </div>
+    </div>
+    <!-- ========== FIM TELA START ========== -->
+
+    <!-- === TELA DE AUTENTICAÇÃO (LOGIN / CADASTRO) === -->
+    <div
+      id="auth-screen"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        backdrop-filter: blur(10px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        animation: fadeIn 0.3s ease-out;
+      "
+    >
+      <!-- Formulário de Login -->
+      <div
+        id="login-form"
+        style="
+          background: linear-gradient(145deg, #1a1a1a, #0f0f0f);
+          padding: 40px;
+          border-radius: 16px;
+          border: 2px solid #f5d922;
+          text-align: center;
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+          animation: fadeIn 0.5s ease-out;
+        "
+      >
+        <h2 style="color: #f5d922; margin-bottom: 30px; font-size: 20px;">JOGAR PAC-LÚPULO</h2>
+        <div id="login-loading" class="loading-spinner" style="display: none;"></div>
+        <p id="login-error" style="color: #ff4444; min-height: 20px; margin-bottom: 20px;"></p>
+        <input
+          type="email"
+          id="login-email"
+          placeholder="Seu Email"
+          class="form-input"
+          required
+        />
+        <input
+          type="password"
+          id="login-password"
+          placeholder="Sua Senha"
+          class="form-input"
+          required
+        />
+        <button
+          id="login-button"
+          class="btn"
+          style="width: 100%; margin-top: 20px;"
+        >
+          Entrar
+        </button>
+        <p style="margin-top: 30px; color: #ccc; font-size: 14px;">
+          Não tem conta ainda?
+          <a
+            href="#"
+            id="show-register-link"
+            style="color: #f5d922; cursor: pointer; text-decoration: none; font-weight: bold;"
+          >
+            Cadastre-se aqui!
+          </a>
+        </p>
+      </div>
+
+      <!-- Formulário de Cadastro -->
+      <div
+        id="register-form"
+        style="
+          background: linear-gradient(145deg, #1a1a1a, #0f0f0f);
+          padding: 40px;
+          border-radius: 16px;
+          border: 2px solid #f5d922;
+          text-align: center;
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+          display: none;
+          animation: fadeIn 0.5s ease-out;
+        "
+      >
+        <h2 style="color: #f5d922; margin-bottom: 30px; font-size: 20px;">CADASTRO PAC-LÚPULO</h2>
+        <div id="register-loading" class="loading-spinner" style="display: none;"></div>
+        <p id="register-error" style="color: #ff4444; min-height: 20px; margin-bottom: 20px;"></p>
+        <input
+          type="text"
+          id="register-name"
+          placeholder="Nome Completo"
+          class="form-input"
+          required
+        />
+        <input
+          type="email"
+          id="register-email"
+          placeholder="Seu Email"
+          class="form-input"
+          required
+        />
+        <input
+          type="tel"
+          id="register-whatsapp"
+          placeholder="Seu WhatsApp (com DDD)"
+          class="form-input"
+          required
+        />
+
+        <!-- Campos Estado e Cidade -->
+        <div
+          style="
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+          "
+        >
+          <select
+            id="register-state"
+            class="form-input"
+            style="flex: 1;"
+            required
+          >
+            <option value="">Estado</option>
+          </select>
+
+          <div style="flex: 1; position: relative">
+            <input
+              list="register-city-list"
+              id="register-city-input"
+              placeholder="Cidade"
+              class="form-input"
+              style="width: 100%;"
+              required
+            />
+            <datalist id="register-city-list"></datalist>
+          </div>
+        </div>
+
+        <input
+          type="password"
+          id="register-password"
+          placeholder="Sua Senha (mín. 6 caracteres)"
+          class="form-input"
+          minlength="6"
+          required
+        />
+        <input
+          type="password"
+          id="register-confirm-password"
+          placeholder="Confirme sua Senha"
+          class="form-input"
+          minlength="6"
+          required
+        />
+        <button
+          id="register-button"
+          class="btn"
+          style="width: 100%; margin-top: 20px;"
+        >
+          Cadastrar
+        </button>
+        <p style="margin-top: 30px; color: #ccc; font-size: 14px;">
+          Já tem conta?
+          <a
+            href="#"
+            id="show-login-link"
+            style="color: #f5d922; cursor: pointer; text-decoration: none; font-weight: bold;"
+          >
+            Faça login aqui!
+          </a>
+        </p>
+      </div>
+    </div>
+    <!-- === FIM TELA DE AUTENTICAÇÃO === -->
+
+    <!-- === TELA DE PONTOS === -->
+    <div
+      id="pontos-screen"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        backdrop-filter: blur(15px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        flex-direction: column;
+        color: #fff;
+        font-family: var(--primary-font);
+        font-size: 14px;
+        animation: fadeIn 0.3s ease-out;
+        overflow-y: auto;
+        padding: 20px;
+      "
+    >
+      <div style="
+        background: linear-gradient(145deg, #1a1a1a, #0f0f0f);
+        border: 2px solid #f5d922;
+        border-radius: 20px;
+        padding: 30px;
+        max-width: 500px;
+        width: 100%;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        text-align: center;
+      ">
+        <h2 style="
+          color: #f5d922; 
+          font-size: 24px; 
+          margin-bottom: 30px;
+          text-shadow: 0 0 10px rgba(245, 217, 34, 0.5);
+        ">🏆 SEUS PONTOS</h2>
+        
+        <div style="
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+          margin-bottom: 30px;
+        ">
+          <div style="
+            background: rgba(245, 217, 34, 0.1);
+            border: 1px solid #f5d922;
+            border-radius: 12px;
+            padding: 20px;
+          ">
+            <div style="color: #f5d922; font-size: 12px; margin-bottom: 8px;">ACUMULADOS</div>
+            <div style="font-size: 20px; font-weight: bold;" id="pontuacao-acumulada">0</div>
+          </div>
+          <div style="
+            background: rgba(245, 217, 34, 0.1);
+            border: 1px solid #f5d922;
+            border-radius: 12px;
+            padding: 20px;
+          ">
+            <div style="color: #f5d922; font-size: 12px; margin-bottom: 8px;">MÁXIMO</div>
+            <div style="font-size: 20px; font-weight: bold;" id="pontuacao-maxima">0</div>
+          </div>
+        </div>
+
+        <h3 style="
+          color: #f5d922; 
+          margin: 30px 0 20px 0; 
+          font-size: 18px;
+          text-shadow: 0 0 8px rgba(245, 217, 34, 0.5);
+        ">🍺 RANKING CERVEJEIRO</h3>
+        
+        <div
+          id="ranking-list"
+          style="
+            width: 100%;
+            background: rgba(17, 17, 17, 0.8);
+            padding: 20px;
+            border-radius: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            scrollbar-width: thin;
+            scrollbar-color: #f5d922 #333;
+            margin-bottom: 30px;
+          "
+        >
+          <div class="loading-spinner"></div>
+        </div>
+        
+        <button
+          id="back-to-game-button"
+          class="btn"
+          style="width: 100%;"
+        >
+          🎮 Voltar ao Jogo
+        </button>
+      </div>
+    </div>
+    <!-- === FIM TELA DE PONTOS === -->
+
+    <!-- Sistema de Notificações -->
+    <div id="notification-container" style="
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 3000;
+      max-width: 300px;
+    "></div>
+
+    <!-- Botões de controle -->
+    <button id="logout-button" style="display: none;">Logout</button>
+    <button id="pontos-button" style="display: none;">Pontos</button>
+
+    <!-- Canvas do jogo -->
+    <canvas id="canvas"></canvas>
+    <canvas id="atlas" style="display: none"></canvas>
+
+    <!-- Importa scripts do jogo -->
+    <script src="pacman.js"></script>
+    <script src="custom-renderer.js"></script>
+    <script src="achievements.js"></script>
+    <script src="mobile-controls.js"></script>
+    <script src="performance-optimizations.js"></script>
+
+    <!-- ========== SISTEMA DE NOTIFICAÇÕES ========== -->
+    <script>
+      // Sistema de Notificações
+      class NotificationSystem {
+        constructor() {
+          this.container = document.getElementById('notification-container');
+          this.notifications = [];
+        }
+
+        show(message, type = 'info', duration = 4000) {
+          const notification = document.createElement('div');
+          const id = Date.now() + Math.random();
+          
+          notification.style.cssText = `
+            background: ${this.getBackgroundColor(type)};
+            color: #fff;
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid ${this.getBorderColor(type)};
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            font-family: inherit;
+            font-size: 12px;
+            animation: slideInRight 0.3s ease-out;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+          `;
+          
+          notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span>${this.getIcon(type)}</span>
+              <span style="flex: 1;">${message}</span>
+              <span style="opacity: 0.7; font-size: 16px;">×</span>
+            </div>
+          `;
+          
+          // Adiciona animação de progresso
+          const progressBar = document.createElement('div');
+          progressBar.style.cssText = `
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 2px;
+            background: rgba(255,255,255,0.3);
+            width: 100%;
+            animation: progressBar ${duration}ms linear;
+          `;
+          notification.appendChild(progressBar);
+          
+          // Event listeners
+          notification.addEventListener('click', () => this.remove(id));
+          
+          this.container.appendChild(notification);
+          this.notifications.push({ id, element: notification });
+          
+          // Auto remove
+          setTimeout(() => this.remove(id), duration);
+          
+          return id;
+        }
+
+        remove(id) {
+          const index = this.notifications.findIndex(n => n.id === id);
+          if (index !== -1) {
+            const notification = this.notifications[index];
+            notification.element.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => {
+              if (notification.element.parentNode) {
+                notification.element.parentNode.removeChild(notification.element);
+              }
+            }, 300);
+            this.notifications.splice(index, 1);
+          }
+        }
+
+        getBackgroundColor(type) {
+          const colors = {
+            success: 'linear-gradient(135deg, #4CAF50, #45a049)',
+            error: 'linear-gradient(135deg, #f44336, #d32f2f)',
+            warning: 'linear-gradient(135deg, #ff9800, #f57c00)',
+            info: 'linear-gradient(135deg, #2196F3, #1976D2)'
+          };
+          return colors[type] || colors.info;
+        }
+
+        getBorderColor(type) {
+          const colors = {
+            success: '#4CAF50',
+            error: '#f44336',
+            warning: '#ff9800',
+            info: '#2196F3'
+          };
+          return colors[type] || colors.info;
+        }
+
+        getIcon(type) {
+          const icons = {
+            success: '✅',
+            error: '❌',
+            warning: '⚠️',
+            info: 'ℹ️'
+          };
+          return icons[type] || icons.info;
+        }
+      }
+
+      // Adiciona animações CSS
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes slideInRight {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOutRight {
+          from { transform: translateX(0); opacity: 1; }
+          to { transform: translateX(100%); opacity: 0; }
+        }
+        @keyframes progressBar {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+      `;
+      document.head.appendChild(style);
+
+      // Instância global
+      window.notifications = new NotificationSystem();
+    </script>
+    <!-- ========== FIM SISTEMA DE NOTIFICAÇÕES ========== -->
+
+    <!-- ========== SCRIPT PARA REMOVER START-SCREEN E EXIBIR AUTH-SCREEN E TOCAR MÚSICA ========== -->
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const startScreen = document.getElementById("start-screen");
+        const authScreen = document.getElementById("auth-screen");
+        const bgMusic = document.getElementById("bg-music");
+
+        function handleStartClick() {
+          // Toca a música de fundo se ainda não estiver tocando
+          if (bgMusic.paused) {
+            bgMusic.play().catch(function (err) {
+              console.warn("Falha ao iniciar música automaticamente:", err);
+            });
+          }
+          // Esconde a tela de start
+          startScreen.style.display = "none";
+          authScreen.style.display = "flex";
+          bgMusic.pause();
+          bgMusic.currentTime = 0;
+        }
+
+        startScreen.addEventListener("click", handleStartClick);
+        startScreen.addEventListener("touchstart", function (e) {
+          e.preventDefault();
+          handleStartClick();
+        });
+      });
+    </script>
+    <!-- ========== FIM DO SCRIPT START/AUTH ========== -->
+
+    <!-- ========== SCRIPT DE AUTENTICAÇÃO (LOGIN + CADASTRO) ========== -->
+    <script>
+      // Referências aos elementos do DOM
+      const loginForm = document.getElementById("login-form");
+      const registerForm = document.getElementById("register-form");
+      const loginErrorP = document.getElementById("login-error");
+      const registerErrorP = document.getElementById("register-error");
+      const showRegisterLink = document.getElementById("show-register-link");
+      const showLoginLink = document.getElementById("show-login-link");
+      const loginButton = document.getElementById("login-button");
+      const registerButton = document.getElementById("register-button");
+      const authScreen = document.getElementById("auth-screen");
+      const logoutButton = document.getElementById("logout-button");
+      const bgMusic = document.getElementById("bg-music");
+
+      // 1) Alternar entre “Login” e “Cadastro”
+      showRegisterLink.addEventListener("click", function (e) {
+        e.preventDefault();
+        loginForm.style.display = "none";
+        registerForm.style.display = "block";
+        loginErrorP.textContent = "";
+      });
+      showLoginLink.addEventListener("click", function (e) {
+        e.preventDefault();
+        registerForm.style.display = "none";
+        loginForm.style.display = "block";
+        registerErrorP.textContent = "";
+      });
+
+      // 2) Função auxiliar para mostrar erro
+      function exibirErro(elementoP, mensagem) {
+        elementoP.textContent = mensagem;
+      }
+
+      // 3) LOGIN
+      loginButton.addEventListener("click", function (e) {
+        e.preventDefault();
+        const emailEl = document.getElementById("login-email");
+        const passwordEl = document.getElementById("login-password");
+        const email = emailEl.value.trim();
+        const password = passwordEl.value;
+        const loadingEl = document.getElementById("login-loading");
+
+        if (!email || !password) {
+          exibirErro(loginErrorP, "Preencha email e senha.");
+          notifications.show("Preencha todos os campos obrigatórios", "warning");
+          return;
+        }
+        
+        // Validação de email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          exibirErro(loginErrorP, "Email inválido.");
+          notifications.show("Por favor, insira um email válido", "warning");
+          return;
+        }
+
+        exibirErro(loginErrorP, "");
+        loadingEl.style.display = "block";
+        loginButton.disabled = true;
+        loginButton.textContent = "Entrando...";
+
+        firebase
+          .auth()
+          .signInWithEmailAndPassword(email, password)
+          .then((cred) => {
+            notifications.show("Login realizado com sucesso! 🎮", "success");
+            const bgMusic = document.getElementById("bg-music");
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
+            iniciarJogo();
+          })
+          .catch((erro) => {
+            let mensagem = "Erro no acesso. Verifique seu Email e Senha.";
+            if (erro.code === 'auth/user-not-found') {
+              mensagem = "Usuário não encontrado. Verifique seu email.";
+            } else if (erro.code === 'auth/wrong-password') {
+              mensagem = "Senha incorreta. Tente novamente.";
+            } else if (erro.code === 'auth/too-many-requests') {
+              mensagem = "Muitas tentativas. Tente novamente em alguns minutos.";
+            }
+            exibirErro(loginErrorP, mensagem);
+            notifications.show(mensagem, "error");
+            console.error("Erro no login:", erro);
+          })
+          .finally(() => {
+            loadingEl.style.display = "none";
+            loginButton.disabled = false;
+            loginButton.textContent = "Entrar";
+          });
+      });
+
+      // 4) CADASTRO
+      registerButton.addEventListener("click", function (e) {
+        e.preventDefault();
+        const nomeEl = document.getElementById("register-name");
+        const emailElReg = document.getElementById("register-email");
+        const whatsappEl = document.getElementById("register-whatsapp");
+        const estadoEl = document.getElementById("register-state");
+        const cidadeEl = document.getElementById("register-city-input");
+        const passElReg = document.getElementById("register-password");
+        const confirmElReg = document.getElementById("register-confirm-password");
+        const loadingEl = document.getElementById("register-loading");
+        // Validação segura dos campos
+        const nome = window.gameOptimizations ? 
+          window.gameOptimizations.sanitizeInput(nomeInput.value) : 
+          nomeInput.value.trim();
+        const email = window.gameOptimizations ? 
+          window.gameOptimizations.sanitizeInput(emailInput.value) : 
+          emailInput.value.trim();
+        const whatsapp = window.gameOptimizations ? 
+          window.gameOptimizations.sanitizeInput(whatsappInput.value) : 
+          whatsappInput.value.trim();
+        const estado = estadoSelect.value;
+        const cidade = window.gameOptimizations ? 
+          window.gameOptimizations.sanitizeInput(cidadeInput.value) : 
+          cidadeInput.value.trim();
+        const senha = senhaInput.value;
+        const confirmSenha = confirmSenhaInput.value;
+
+        // Validações de segurança
+        if (window.gameOptimizations) {
+          if (!window.gameOptimizations.isValidName(nome)) {
+            showNotification("Nome deve conter pelo menos 2 palavras válidas", "error");
+            return;
+          }
+          if (!window.gameOptimizations.isValidEmail(email)) {
+            showNotification("Email inválido", "error");
+            return;
+          }
+          if (!window.gameOptimizations.isValidWhatsApp(whatsapp)) {
+            showNotification("WhatsApp inválido", "error");
+            return;
+          }
+        }
+
+        // Rate limiting
+        if (window.gameOptimizations && window.gameOptimizations.rateLimiter) {
+          if (!window.gameOptimizations.rateLimiter.isAllowed('registration_' + email, 3, 300000)) {
+            showNotification("Muitas tentativas de cadastro. Tente novamente em 5 minutos.", "error");
+            return;
+          }
+        }idações
+        if (!nome || !email || !whatsapp || !estado || !cidade || !password || !confirmPass) {
+          exibirErro(registerErrorP, "Preencha todos os campos obrigatórios.");
+          notifications.show("Todos os campos são obrigatórios", "warning");
+          return;
+        }
+
+        // Validação de nome (mínimo 2 palavras)
+        if (nome.split(' ').filter(word => word.length > 0).length < 2) {
+          exibirErro(registerErrorP, "Digite seu nome completo.");
+          notifications.show("Por favor, digite seu nome completo", "warning");
+          return;
+        }
+
+        // Validação de email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          exibirErro(registerErrorP, "Email inválido.");
+          notifications.show("Por favor, insira um email válido", "warning");
+          return;
+        }
+
+        // Validação de WhatsApp
+        const cleanWhatsapp = whatsapp.replace(/\D/g, '');
+        if (cleanWhatsapp.length < 10 || cleanWhatsapp.length > 11) {
+          exibirErro(registerErrorP, "WhatsApp deve ter 10 ou 11 dígitos.");
+          notifications.show("WhatsApp inválido. Use formato: (11) 99999-9999", "warning");
+          return;
+        }
+
+        // Validação de senha
+        if (password.length < 6) {
+          exibirErro(registerErrorP, "Senha deve ter pelo menos 6 caracteres.");
+          notifications.show("Senha muito curta. Mínimo 6 caracteres", "warning");
+          return;
+        }
+
+        if (password !== confirmPass) {
+          exibirErro(registerErrorP, "As senhas não coincidem.");
+          notifications.show("As senhas não coincidem", "warning");
+          return;
+        }
+
+        exibirErro(registerErrorP, "");
+        loadingEl.style.display = "block";
+        registerButton.disabled = true;
+        registerButton.textContent = "Cadastrando...";
+
+        // Cria o usuário no Firebase Auth
+        firebase
+          .auth()
+          .createUserWithEmailAndPassword(email, password)
+          .then((cred) => {
+            const userId = cred.user.uid;
+            notifications.show("Conta criada! Salvando dados...", "info");
+            
+            // Salva os dados adicionais no Firestore
+            return firebase.firestore().collection("players").doc(userId).set({
+              email: email,
+              nome: nome,
+              whatsapp: cleanWhatsapp,
+              estado: estado,
+              cidade: cidade,
+              dataCadastro: firebase.firestore.FieldValue.serverTimestamp(),
+              nivelMax: 0,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              pontuacaoAcumulada: 0,
+              pontuacaoMaxima: 0,
+              quantidadePlays: 0,
+            });
+          })
+          .then(() => {
+            notifications.show("Cadastro realizado com sucesso! 🎉", "success");
+            // Faz login automático após salvar no Firestore
+            return firebase.auth().signInWithEmailAndPassword(email, password);
+          })
+          .then(() => {
+            const bgMusic = document.getElementById("bg-music");
+            // Pausa a música ao finalizar cadastro
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
+            authScreen.style.display = "none";
+            logoutButton.style.display = "block";
+            pontosButton.style.display = "block";
+          })
+          .catch((erro) => {
+            let mensagem = erro.message;
+            if (erro.code === 'auth/email-already-in-use') {
+              mensagem = "Este email já está em uso. Tente fazer login.";
+            } else if (erro.code === 'auth/weak-password') {
+              mensagem = "Senha muito fraca. Use pelo menos 6 caracteres.";
+            } else if (erro.code === 'auth/invalid-email') {
+              mensagem = "Email inválido.";
+            }
+            exibirErro(registerErrorP, mensagem);
+            notifications.show(mensagem, "error");
+            console.error("Erro no cadastro:", erro);
+          })
+          .finally(() => {
+            loadingEl.style.display = "none";
+            registerButton.disabled = false;
+            registerButton.textContent = "Cadastrar";
+          });
+      });
+
+      // 5) Verifica estado de autenticação ao carregar
+      firebase.auth().onAuthStateChanged(function (user) {
+        if (user) {
+          // Se já estivesse logado, pula direto para o jogo
+          authScreen.style.display = "none";
+          logoutButton.style.display = "block";
+          pontosButton.style.display = "block";
+        } else {
+          // Se não estiver logado, mostra formulário de login
+          authScreen.style.display = "flex";
+          loginForm.style.display = "block";
+          registerForm.style.display = "none";
+          loginErrorP.textContent = "";
+          registerErrorP.textContent = "";
+          logoutButton.style.display = "none";
+        }
+      });
+
+      // 6) LOGOUT
+      logoutButton.addEventListener("click", function () {
+        firebase
+          .auth()
+          .signOut()
+          .then(() => {
+            // Ao sair, recarrega a página para exibir tela de autenticação
+            location.reload();
+          });
+      });
+
+      // 7) PONTOS
+      const pontosButton = document.getElementById("pontos-button");
+      const pontosScreen = document.getElementById("pontos-screen");
+      const backToGameButton = document.getElementById("back-to-game-button");
+      const pontuacaoAcumuladaSpan = document.getElementById(
+        "pontuacao-acumulada",
+      );
+      const pontuacaoMaximaSpan = document.getElementById("pontuacao-maxima");
+      const rankingListDiv = document.getElementById("ranking-list");
+
+      pontosButton.addEventListener("click", async function () {
+        pontosScreen.style.display = "flex";
+        document.getElementById("canvas").style.display = "none";
+        logoutButton.style.display = "none";
+        pontosButton.style.display = "none";
+
+        // Detecção mobile aprimorada
+        const isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                         (window.innerWidth <= 768 && 'ontouchstart' in window);
+        
+        console.log("📱 Device type:", isMobile ? 'Mobile' : 'Desktop');
+        console.log("📱 Screen width:", window.innerWidth);
+
+        // Fetch user stats com lógica mobile aprimorada
+        const user = firebase.auth().currentUser;
+        if (user) {
+          console.log("👤 Fetching user stats for user:", user.uid);
+          console.log("Device type:", /Mobi|Android/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop');
+          try {
+            const playerDoc = await db
+              .collection("players")
+              .doc(user.uid)
+              .get();
+            if (playerDoc.exists) {
+              const data = playerDoc.data();
+              console.log("📊 User data fetched:", data);
+              console.log("🔑 Data keys:", Object.keys(data));
+              
+              // Lógica definitiva para estruturas de dados
+              let pontuacaoAcumulada = 0;
+              let pontuacaoMaxima = 0;
+              
+              // Prioridade 1: Estrutura playersAvatares
+              if (data.playersAvatares && typeof data.playersAvatares === 'object') {
+                const stats = data.playersAvatares;
+                pontuacaoAcumulada = stats.pontuacaoAcumulada || 0;
+                pontuacaoMaxima = stats.pontuacaoMaxima || 0;
+                console.log("✅ Using playersAvatares structure");
+              }
+              // Prioridade 2: Estrutura no nível raiz
+              else if (data.pontuacaoAcumulada !== undefined || data.pontuacaoMaxima !== undefined) {
+                pontuacaoAcumulada = data.pontuacaoAcumulada || 0;
+                pontuacaoMaxima = data.pontuacaoMaxima || 0;
+                console.log("✅ Using root level structure");
+              }
+              // Prioridade 3: Fallbacks alternativos
+              else {
+                pontuacaoAcumulada = data.totalScore || data.score || 0;
+                pontuacaoMaxima = data.maxScore || data.highScore || data.bestScore || 0;
+                console.log("✅ Using fallback structure");
+              }
+              
+              console.log("📊 Final stats - Acumulada:", pontuacaoAcumulada, "Máxima:", pontuacaoMaxima);
+              
+              // Atualiza interface com garantia de exibição
+              pontuacaoAcumuladaSpan.textContent = pontuacaoAcumulada;
+              pontuacaoMaximaSpan.textContent = pontuacaoMaxima;
+              
+              // Log específico para mobile
+              if (isMobile) {
+                console.log("📱 Mobile stats updated - Acumulada:", pontuacaoAcumuladaSpan.textContent, "Máxima:", pontuacaoMaximaSpan.textContent);
+              }
+            } else {
+              console.log("User document does not exist.");
+              pontuacaoAcumuladaSpan.textContent = 0;
+              pontuacaoMaximaSpan.textContent = 0;
+            }
+          } catch (error) {
+            console.error("Error fetching user stats:", error);
+            pontuacaoAcumuladaSpan.textContent = 0;
+            pontuacaoMaximaSpan.textContent = 0;
+          }
+        } else {
+          console.log("No user logged in.");
+          pontuacaoAcumuladaSpan.textContent = 0;
+          pontuacaoMaximaSpan.textContent = 0;
+        }
+
+        // Fetch ranking com filtragem rigorosa
+        rankingListDiv.innerHTML = ""; // Clear previous ranking
+        console.log("🏆 Fetching ranking...");
+        try {
+          // Get all players and sort client-side to avoid Firestore index requirements
+          const rankingSnapshot = await db.collection("players").get();
+
+          console.log("🏆 Ranking snapshot size:", rankingSnapshot.size);
+          if (rankingSnapshot.empty) {
+            rankingListDiv.innerHTML =
+              "<p style='font-size: 12px;'>Nenhum jogador no ranking ainda.</p>";
+          } else {
+            // Filtragem rigorosa de dados válidos
+            const players = [];
+            rankingSnapshot.forEach((doc) => {
+              const data = doc.data();
+              const docId = doc.id;
+              
+              // Ignora documentos de teste ou inválidos
+              if (!data.nome || typeof data.nome !== 'string' || data.nome.trim() === '') {
+                console.log("🚫 Ignorando documento sem nome válido:", docId);
+                return;
+              }
+              
+              // Ignora nomes de teste conhecidos
+              const nomeNormalizado = data.nome.trim().toUpperCase();
+              const nomesIgnorados = ['NOVO', 'BETO', 'TEST', 'TESTE', 'ADMIN', 'DEBUG'];
+              if (nomesIgnorados.includes(nomeNormalizado)) {
+                console.log("🚫 Ignorando nome de teste:", data.nome);
+                return;
+              }
+              
+              // Extrai pontuação máxima com múltiplas tentativas
+              let pontuacaoMaxima = 0;
+              if (data.playersAvatares && typeof data.playersAvatares === 'object') {
+                pontuacaoMaxima = data.playersAvatares.pontuacaoMaxima || 0;
+              } else {
+                pontuacaoMaxima = data.pontuacaoMaxima || data.maxScore || data.highScore || data.bestScore || 0;
+              }
+              
+              // Só inclui jogadores com pontuação válida
+              if (pontuacaoMaxima > 0 && pontuacaoMaxima < 1000000) { // Limite máximo razoável
+                players.push({
+                  nome: data.nome.trim(),
+                  pontuacaoMaxima: pontuacaoMaxima,
+                  docId: docId
+                });
+                console.log("✅ Jogador válido adicionado:", data.nome, "-", pontuacaoMaxima, "pts");
+              } else {
+                console.log("🚫 Ignorando jogador com pontuação inválida:", data.nome, "-", pontuacaoMaxima);
+              }
+            });
+
+            // Sort by score descending and take top 100
+            players.sort((a, b) => b.pontuacaoMaxima - a.pontuacaoMaxima);
+            const top100 = players.slice(0, 100);
+
+            console.log("🏆 Top players found:", top100.length);
+
+            if (top100.length === 0) {
+              rankingListDiv.innerHTML =
+                "<p style='font-size: 12px;'>Nenhum jogador com pontuação válida no ranking ainda.</p>";
+            } else {
+              top100.forEach((player, index) => {
+                const rankingItem = document.createElement("p");
+                rankingItem.style.margin = "5px 0";
+                rankingItem.style.padding = "5px";
+                rankingItem.style.borderBottom = "1px solid #333";
+                rankingItem.style.fontSize = "12px";
+                rankingItem.style.color = "#fff"; // Cor branca padrão
+                rankingItem.textContent = `${index + 1}. ${player.nome} - ${player.pontuacaoMaxima} pts`;
+                rankingListDiv.appendChild(rankingItem);
+                
+                console.log(`🏆 ${index + 1}. ${player.nome} - ${player.pontuacaoMaxima} pts`);
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching ranking:", error);
+          if (error.code === "permission-denied") {
+            rankingListDiv.innerHTML =
+              "<p style='color: #f5d922; font-size: 12px;'>Ranking temporariamente indisponível. Configurando permissões...</p>";
+          } else {
+            rankingListDiv.innerHTML = "<p style='font-size: 12px;'>Erro ao carregar ranking.</p>";
+          }
+        }
+      });
+
+      backToGameButton.addEventListener("click", function () {
+        pontosScreen.style.display = "none";
+        document.getElementById("canvas").style.display = "block";
+        logoutButton.style.display = "block";
+        pontosButton.style.display = "block";
+      });
+    </script>
+
+    <script>
+      function updateStatsFirestore(score, level) {
+        const user = firebase.auth().currentUser;
+        if (!user) {
+          return;
+        }
+        const userId = user.uid;
+        const playerRef = firebase
+          .firestore()
+          .collection("players")
+          .doc(userId);
+
+        playerRef.get().then(async (doc) => {
+          if (!doc.exists) {
+            return;
+          }
+
+          const data = doc.data();
+          const prevNivelMax = data.nivelMax || 0;
+          const prevPontAcum = data.pontuacaoAcumulada || 0;
+          const prevPontMax = data.pontuacaoMaxima || 0;
+          const prevQtyPlays = data.quantidadePlays || 0;
+
+          const newNivelMax = level > prevNivelMax ? level : prevNivelMax;
+          const newPontAcum = prevPontAcum + score;
+          const newPontMax = score > prevPontMax ? score : prevPontMax;
+          const newQtyPlays = prevQtyPlays + 1;
+
+          // Analytics detalhados
+          const gameSession = {
+            score: score,
+            level: level,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            duration: Date.now() - (window.gameStartTime || Date.now()),
+            isNewRecord: score > prevPontMax
+          };
+
+          // Atualiza estatísticas principais
+          const updateData = {
+            dataUltimoPlay: firebase.firestore.FieldValue.serverTimestamp(),
+            nivelMax: newNivelMax,
+            pontuacaoAcumulada: newPontAcum,
+            pontuacaoMaxima: newPontMax,
+            quantidadePlays: newQtyPlays,
+            lastGameSession: gameSession
+          };
+
+          // Adiciona à coleção de sessões para analytics
+          const sessionsRef = firebase.firestore()
+            .collection('players')
+            .doc(userId)
+            .collection('sessions');
+          
+          await sessionsRef.add(gameSession);
+
+          // Atualiza documento principal
+          await playerRef.update(updateData);
+
+          // Verifica conquistas
+          if (window.achievementSystem) {
+            const stats = {
+              pontuacaoMaxima: newPontMax,
+              pontuacaoAcumulada: newPontAcum,
+              quantidadePlays: newQtyPlays,
+              nivelMax: newNivelMax
+            };
+            
+            const gameStats = {
+              currentScore: score,
+              currentLevel: level,
+              isNewRecord: score > prevPontMax
+            };
+
+            await window.achievementSystem.checkAchievements(stats, gameStats);
+          }
+
+          // Notificação de novo recorde
+          if (score > prevPontMax && window.notifications) {
+            window.notifications.show(
+              `🎉 Novo recorde pessoal: ${score} pontos!`,
+              'success',
+              5000
+            );
+          }
+
+          console.log('✅ Estatísticas atualizadas com sucesso');
+        }).catch(err => {
+          console.error('❌ Erro ao atualizar estatísticas:', err);
+          if (window.notifications) {
+            window.notifications.show(
+              'Erro ao salvar pontuação. Verifique sua conexão.',
+              'error'
+            );
+          }
+        });
+      }
+
+      // Função para iniciar tracking de sessão
+      function startGameSession() {
+        window.gameStartTime = Date.now();
+      }
+
+      // Função para analytics de gameplay
+      function trackGameplayEvent(eventType, data = {}) {
+        const user = firebase.auth().currentUser;
+        if (!user) return;
+
+        const eventData = {
+          type: eventType,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          userId: user.uid,
+          ...data
+        };
+
+        // Salva evento na coleção de analytics
+        firebase.firestore()
+          .collection('analytics')
+          .add(eventData)
+          .catch(err => console.error('Erro ao salvar analytics:', err));
+      }
+    </script>
+
+    <script>
+      function iniciarJogo() {
+        try {
+          document.getElementById("auth-screen").style.display = "none";
+          document.getElementById("logout-button").style.display = "block";
+          document.getElementById("pontos-button").style.display = "block";
+
+          // Inicia tracking da sessão de jogo
+          startGameSession();
+          
+          // Track evento de início de jogo
+          trackGameplayEvent('game_start', {
+            timestamp: new Date().toISOString()
+          });
+
+          // Aguarda o executive estar disponível com timeout de segurança
+          let tentativas = 0;
+          const maxTentativas = 50; // 5 segundos máximo
+          const esperar = setInterval(() => {
+            tentativas++;
+            if (
+              typeof executive !== "undefined" &&
+              typeof executive.init === "function" &&
+              typeof switchState === "function" &&
+              typeof homeState !== "undefined"
+            ) {
+              clearInterval(esperar);
+              executive.init();
+              switchState(homeState);
+              
+              // Notificação de boas-vindas
+              if (window.notifications) {
+                window.notifications.show(
+                  "🎮 Bem-vindo ao Pac-Lúpulo! Colete lúpulos e evite os fantasmas!",
+                  "info",
+                  4000
+                );
+              }
+            } else if (tentativas >= maxTentativas) {
+              clearInterval(esperar);
+              console.error("Timeout: Não foi possível inicializar o jogo");
+              // Removido aviso de erro desnecessário - o jogo funciona normalmente
+            }
+          }, 100);
+        } catch (err) {
+          console.error("Erro ao iniciar o jogo:", err);
+          // Removido aviso de erro desnecessário - o jogo funciona normalmente
+        }
+      }
+    </script>
+  </body>
+</html>
