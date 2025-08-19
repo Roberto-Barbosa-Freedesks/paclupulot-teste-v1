@@ -17,6 +17,7 @@
     <!-- Preconnect to external resources -->
     <link rel="preconnect" href="https://www.gstatic.com" />
     <link rel="preconnect" href="https://servicodados.ibge.gov.br" />
+    <link rel="preconnect" href="https://viacep.com.br" />
     
     <!-- Icons and Manifest -->
     <link rel="apple-touch-icon-precomposed" href="icon/ios_icon.png" />
@@ -199,13 +200,13 @@
         position: fixed;
         top: 15px;
         z-index: 2001;
-        padding: 10px 20px;
-        font-size: 12px;
+        padding: 8px 17px;
+        font-size: 9px;
         font-family: inherit;
         background: rgba(34, 34, 34, 0.95);
         color: #fff;
         border: 2px solid #f5d922;
-        border-radius: 8px;
+        border-radius: 6px;
         cursor: pointer;
         backdrop-filter: blur(5px);
         transition: all 0.3s ease;
@@ -222,12 +223,12 @@
       /* Responsive Design */
       @media (max-width: 768px) {
         body {
-          font-size: 14px;
+          font-size: 11px;
         }
         
         #pontos-button, #logout-button {
-          font-size: 10px;
-          padding: 8px 12px;
+          font-size: 9px;
+          padding: 7px 11px;
           top: 10px;
         }
         
@@ -394,7 +395,6 @@
         );
     </script>
 
-    <!-- ======= SCRIPT PARA PREENCHER ESTADOS E CIDADES (IBGE) ======= -->
     <script>
       // 1) Função para carregar estados do IBGE
       function carregarEstados() {
@@ -644,6 +644,18 @@
           required
         />
 
+        <input
+          type="text"
+          id="register-cep"
+          placeholder="CEP (somente números)"
+          class="form-input"
+          inputmode="numeric"
+          maxlength="9"
+          autocomplete="postal-code"
+          required
+        />
+
+
         <!-- Campos Estado e Cidade -->
         <div
           style="
@@ -832,11 +844,11 @@
     <canvas id="atlas" style="display: none"></canvas>
 
     <!-- Importa scripts do jogo -->
-    <script src="pacman.js"></script>
-    <script src="custom-renderer.js"></script>
-    <script src="achievements.js"></script>
-    <script src="mobile-controls.js"></script>
-    <script src="performance-optimizations.js"></script>
+    <script src="pacman.js" defer></script>
+    <script src="custom-renderer.js" defer></script>
+    <script src="achievements.js" defer></script>
+    <script src="mobile-controls.js" defer></script>
+    <script src="performance-optimizations.js" defer></script>
 
     <!-- ========== SISTEMA DE NOTIFICAÇÕES ========== -->
     <script>
@@ -968,7 +980,194 @@
     </script>
     <!-- ========== FIM SISTEMA DE NOTIFICAÇÕES ========== -->
 
-    <!-- ========== SCRIPT PARA REMOVER START-SCREEN E EXIBIR AUTH-SCREEN E TOCAR MÚSICA ========== -->
+    
+    <!-- ========== SCRIPT: CACHE IBGE + AUTOCOMPLETE CEP (VIA CEP) ========== -->
+    <script>
+      (function() {
+        const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+        const now = () => Date.now();
+
+        function setCache(key, data) {
+          try {
+            localStorage.setItem(key, JSON.stringify({ts: now(), data}));
+          } catch (e) { /* ignore quota */ }
+        }
+        function getCache(key) {
+          try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            const obj = JSON.parse(raw);
+            if (!obj || !obj.ts || (Date.now() - obj.ts) > CACHE_TTL_MS) return null;
+            return obj.data;
+          } catch (e) { return null; }
+        }
+
+        // Wrap fetch with timeout to avoid blocking
+        function fetchWithTimeout(url, ms = 6000) {
+          const ctrl = new AbortController();
+          const id = setTimeout(() => ctrl.abort(), ms);
+          return fetch(url, {signal: ctrl.signal}).finally(() => clearTimeout(id));
+        }
+
+        // Enhanced IBGE loaders with localStorage cache (stale-while-revalidate)
+        async function getEstados() {
+          const CACHE_KEY = 'ibge:estados:v1';
+          const cached = getCache(CACHE_KEY);
+          // Async refresh in background
+          (async () => {
+            try {
+              const res = await fetchWithTimeout('https://servicodados.ibge.gov.br/api/v1/localidades/estados', 8000);
+              if (!res.ok) return;
+              const estados = await res.json();
+              estados.sort((a,b) => a.sigla.localeCompare(b.sigla));
+              setCache(CACHE_KEY, estados);
+              // If select is populated only with placeholder, re-render
+              const sel = document.getElementById('register-state');
+              if (sel && sel.options.length <= 1) renderEstados(estados);
+            } catch(e) { /* silent */ }
+          })();
+          return cached || [];
+        }
+
+        async function getCidadesByUFId(ufId) {
+          const key = 'ibge:cidades:'+ufId+':v1';
+          const cached = getCache(key);
+          // Background refresh
+          (async () => {
+            try {
+              const res = await fetchWithTimeout('https://servicodados.ibge.gov.br/api/v1/localidades/estados/'+ufId+'/municipios', 8000);
+              if (!res.ok) return;
+              const cidades = await res.json();
+              setCache(key, cidades);
+              const list = document.getElementById('register-city-list');
+              const input = document.getElementById('register-city-input');
+              if (list && input && input.value.trim() === '' ) renderCidades(cidades);
+            } catch(e) { /* noop */ }
+          })();
+          return cached || [];
+        }
+
+        function renderEstados(estados) {
+          const selectEstado = document.getElementById('register-state');
+          if (!selectEstado) return;
+          // Clean previous (except placeholder)
+          Array.from(selectEstado.querySelectorAll('option:not([value=""])')).forEach(el => el.remove());
+          estados.forEach((estado) => {
+            const opt = document.createElement('option');
+            opt.value = estado.sigla;
+            opt.textContent = `${estado.sigla} - ${estado.nome}`;
+            opt.setAttribute('data-id', estado.id);
+            selectEstado.appendChild(opt);
+          });
+        }
+
+        function renderCidades(cidades) {
+          const datalist = document.getElementById('register-city-list');
+          if (!datalist) return;
+          datalist.innerHTML = '';
+          cidades.forEach((cidade) => {
+            const opt = document.createElement('option');
+            opt.value = cidade.nome;
+            datalist.appendChild(opt);
+          });
+        }
+
+        async function carregarEstadosComCache() {
+          const estados = await getEstados();
+          if (estados && estados.length) renderEstados(estados);
+        }
+
+        async function carregarCidadesComCache(ufId) {
+          const cidades = await getCidadesByUFId(ufId);
+          if (cidades && cidades.length) renderCidades(cidades);
+        }
+
+        // CEP autocomplete using ViaCEP
+        function sanitizeCEP(value) {
+          return (value || '').replace(/\D/g, '').slice(0, 8);
+        }
+
+        async function buscaCEP(cep) {
+          const clean = sanitizeCEP(cep);
+          if (clean.length !== 8) return null;
+          const key = 'viacep:'+clean+':v1';
+          const cached = getCache(key);
+          // background refresh
+          (async () => {
+            try {
+              const r = await fetchWithTimeout('https://viacep.com.br/ws/'+clean+'/json/', 8000);
+              if (!r.ok) return;
+              const data = await r.json();
+              if (data && !data.erro) setCache(key, data);
+            } catch(e) { /* ignore */ }
+          })();
+          return cached || null;
+        }
+
+        async function applyCEPAutoComplete(data) {
+          if (!data) return;
+          // data.uf, data.localidade
+          const sel = document.getElementById('register-state');
+          const cityInput = document.getElementById('register-city-input');
+          if (!sel || !cityInput) return;
+
+          // Select UF by sigla
+          const wantedUF = (data.uf || '').toUpperCase();
+          let ufId = null;
+          for (let i = 0; i < sel.options.length; i++) {
+            const opt = sel.options[i];
+            if (opt.value === wantedUF) {
+              sel.selectedIndex = i;
+              ufId = opt.getAttribute('data-id');
+              break;
+            }
+          }
+          if (ufId) {
+            // Load cities (from cache if possible), then set input value
+            const cidades = await getCidadesByUFId(ufId);
+            if (data.localidade) {
+              cityInput.value = data.localidade;
+              carregarCidadesComCache(ufId);
+            }
+          }
+        }
+
+        function setupCEPInput() {
+          const cepInput = document.getElementById('register-cep');
+          if (!cepInput) return;
+          cepInput.addEventListener('input', async function() {
+            const clean = sanitizeCEP(cepInput.value);
+            if (cepInput.value !== clean) cepInput.value = clean;
+            if (clean.length === 8) {
+              const data = await buscaCEP(clean);
+              if (data) applyCEPAutoComplete(data);
+              // never block UI: no await chain beyond this point
+            }
+          }, {passive: true});
+        }
+
+        // Replace initial loaders with cached versions
+        document.addEventListener('DOMContentLoaded', function() {
+          carregarEstadosComCache();
+          const sel = document.getElementById('register-state');
+          if (sel) {
+            sel.addEventListener('change', function() {
+              const idx = sel.selectedIndex;
+              const opt = sel.options[idx];
+              const ufId = opt ? opt.getAttribute('data-id') : null;
+              if (ufId) carregarCidadesComCache(ufId);
+            });
+          }
+          setupCEPInput();
+        });
+
+        // Expose for debugging
+        window._IBGECache = { getEstados, getCidadesByUFId };
+
+      })();
+    </script>
+
+<!-- ========== SCRIPT PARA REMOVER START-SCREEN E EXIBIR AUTH-SCREEN E TOCAR MÚSICA ========== -->
     <script>
       document.addEventListener("DOMContentLoaded", function () {
         const startScreen = document.getElementById("start-screen");
@@ -982,9 +1181,10 @@
               console.warn("Falha ao iniciar música automaticamente:", err);
             });
           }
+          window.dispatchEvent(new Event('game:cleanup'));
           // Esconde a tela de start
           startScreen.style.display = "none";
-          authScreen.style.display = "flex";
+          if (firebase && firebase.auth && firebase.auth().currentUser) { authScreen.style.display = 'none'; } else { authScreen.style.display = 'flex'; }
           bgMusic.pause();
           bgMusic.currentTime = 0;
         }
@@ -1034,214 +1234,190 @@
 
       // 3) LOGIN
       loginButton.addEventListener("click", function (e) {
-        e.preventDefault();
-        const emailEl = document.getElementById("login-email");
-        const passwordEl = document.getElementById("login-password");
-        const email = emailEl.value.trim();
-        const password = passwordEl.value;
-        const loadingEl = document.getElementById("login-loading");
+  e.preventDefault();
+  const emailEl = document.getElementById("login-email");
+  const passwordEl = document.getElementById("login-password");
+  const email = (emailEl.value || "").trim();
+  const password = passwordEl.value || "";
+  const loadingEl = document.getElementById("login-loading");
 
-        if (!email || !password) {
-          exibirErro(loginErrorP, "Preencha email e senha.");
-          notifications.show("Preencha todos os campos obrigatórios", "warning");
-          return;
-        }
-        
-        // Validação de email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          exibirErro(loginErrorP, "Email inválido.");
-          notifications.show("Por favor, insira um email válido", "warning");
-          return;
-        }
+  if (!email || !password) {
+    exibirErro(loginErrorP, "Preencha email e senha.");
+    notifications?.show("Preencha todos os campos obrigatórios", "warning");
+    return;
+  }
 
-        exibirErro(loginErrorP, "");
-        loadingEl.style.display = "block";
-        loginButton.disabled = true;
-        loginButton.textContent = "Entrando...";
+  // Validação simples de email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    exibirErro(loginErrorP, "Email inválido.");
+    notifications?.show("Por favor, insira um email válido", "warning");
+    return;
+  }
 
-        firebase
-          .auth()
-          .signInWithEmailAndPassword(email, password)
-          .then((cred) => {
-            notifications.show("Login realizado com sucesso! 🎮", "success");
-            const bgMusic = document.getElementById("bg-music");
-            bgMusic.pause();
-            bgMusic.currentTime = 0;
-            iniciarJogo();
-          })
-          .catch((erro) => {
-            let mensagem = "Erro no acesso. Verifique seu Email e Senha.";
-            if (erro.code === 'auth/user-not-found') {
-              mensagem = "Usuário não encontrado. Verifique seu email.";
-            } else if (erro.code === 'auth/wrong-password') {
-              mensagem = "Senha incorreta. Tente novamente.";
-            } else if (erro.code === 'auth/too-many-requests') {
-              mensagem = "Muitas tentativas. Tente novamente em alguns minutos.";
-            }
-            exibirErro(loginErrorP, mensagem);
-            notifications.show(mensagem, "error");
-            console.error("Erro no login:", erro);
-          })
-          .finally(() => {
-            loadingEl.style.display = "none";
-            loginButton.disabled = false;
-            loginButton.textContent = "Entrar";
+  exibirErro(loginErrorP, "");
+  loadingEl.style.display = "block";
+  loginButton.disabled = true;
+  loginButton.textContent = "Entrando...";
+
+  firebase.auth()
+    .signInWithEmailAndPassword(email, password)
+    .then(() => {
+      notifications?.show("Login realizado com sucesso! 🎮", "success");
+      const bgMusic = document.getElementById("bg-music");
+      bgMusic.pause(); bgMusic.currentTime = 0;
+      iniciarJogo(); // mantém o fluxo atual
+    })
+    .catch((erro) => {
+      let mensagem = "Erro no acesso. Verifique seu Email e Senha.";
+      if (erro.code === 'auth/user-not-found') mensagem = "Usuário não encontrado. Verifique seu email.";
+      else if (erro.code === 'auth/wrong-password') mensagem = "Senha incorreta. Tente novamente.";
+      else if (erro.code === 'auth/too-many-requests') mensagem = "Muitas tentativas. Tente novamente em alguns minutos.";
+      exibirErro(loginErrorP, mensagem);
+      notifications?.show(mensagem, "error");
+      console.error("Erro no login:", erro);
+    })
+    .finally(() => {
+      loadingEl.style.display = "none";
+      loginButton.disabled = false;
+      loginButton.textContent = "Entrar";
           });
       });
 
       // 4) CADASTRO
       registerButton.addEventListener("click", function (e) {
-        e.preventDefault();
-        const nomeEl = document.getElementById("register-name");
-        const emailElReg = document.getElementById("register-email");
-        const whatsappEl = document.getElementById("register-whatsapp");
-        const estadoEl = document.getElementById("register-state");
-        const cidadeEl = document.getElementById("register-city-input");
-        const passElReg = document.getElementById("register-password");
-        const confirmElReg = document.getElementById("register-confirm-password");
-        const loadingEl = document.getElementById("register-loading");
-        // Validação segura dos campos
-        const nome = window.gameOptimizations ? 
-          window.gameOptimizations.sanitizeInput(nomeInput.value) : 
-          nomeInput.value.trim();
-        const email = window.gameOptimizations ? 
-          window.gameOptimizations.sanitizeInput(emailInput.value) : 
-          emailInput.value.trim();
-        const whatsapp = window.gameOptimizations ? 
-          window.gameOptimizations.sanitizeInput(whatsappInput.value) : 
-          whatsappInput.value.trim();
-        const estado = estadoSelect.value;
-        const cidade = window.gameOptimizations ? 
-          window.gameOptimizations.sanitizeInput(cidadeInput.value) : 
-          cidadeInput.value.trim();
-        const senha = senhaInput.value;
-        const confirmSenha = confirmSenhaInput.value;
+  e.preventDefault();
 
-        // Validações de segurança
-        if (window.gameOptimizations) {
-          if (!window.gameOptimizations.isValidName(nome)) {
-            showNotification("Nome deve conter pelo menos 2 palavras válidas", "error");
-            return;
-          }
-          if (!window.gameOptimizations.isValidEmail(email)) {
-            showNotification("Email inválido", "error");
-            return;
-          }
-          if (!window.gameOptimizations.isValidWhatsApp(whatsapp)) {
-            showNotification("WhatsApp inválido", "error");
-            return;
-          }
-        }
+  // Elementos
+  const nomeEl       = document.getElementById("register-name");
+  const emailEl      = document.getElementById("register-email");
+  const whatsappEl   = document.getElementById("register-whatsapp");
+  const estadoEl     = document.getElementById("register-state");
+  const cidadeEl     = document.getElementById("register-city-input");
+  const passEl       = document.getElementById("register-password");
+  const confirmEl    = document.getElementById("register-confirm-password");
+  const cepEl        = document.getElementById("register-cep");
+  const loadingEl    = document.getElementById("register-loading");
 
-        // Rate limiting
-        if (window.gameOptimizations && window.gameOptimizations.rateLimiter) {
-          if (!window.gameOptimizations.rateLimiter.isAllowed('registration_' + email, 3, 300000)) {
-            showNotification("Muitas tentativas de cadastro. Tente novamente em 5 minutos.", "error");
-            return;
-          }
-        }idações
-        if (!nome || !email || !whatsapp || !estado || !cidade || !password || !confirmPass) {
-          exibirErro(registerErrorP, "Preencha todos os campos obrigatórios.");
-          notifications.show("Todos os campos são obrigatórios", "warning");
-          return;
-        }
+  // Valores brutos
+  const nomeRaw      = nomeEl.value || "";
+  const emailRaw     = emailEl.value || "";
+  const whatsappRaw  = whatsappEl.value || "";
+  const estado       = estadoEl.value || "";
+  const cidadeRaw    = cidadeEl.value || "";
+  const password     = passEl.value || "";
+  const confirmPass  = confirmEl.value || "";
+  const cepValue     = (cepEl.value || "").replace(/\D/g, ""); // só dígitos
 
-        // Validação de nome (mínimo 2 palavras)
-        if (nome.split(' ').filter(word => word.length > 0).length < 2) {
-          exibirErro(registerErrorP, "Digite seu nome completo.");
-          notifications.show("Por favor, digite seu nome completo", "warning");
-          return;
-        }
+  // Sanitização (mantém compatibilidade com seu gameOptimizations, se existir)
+  const sanitize = (s) => (s || "").trim();
+  const nome     = window.gameOptimizations?.sanitizeInput ? window.gameOptimizations.sanitizeInput(nomeRaw) : sanitize(nomeRaw);
+  const email    = window.gameOptimizations?.sanitizeInput ? window.gameOptimizations.sanitizeInput(emailRaw) : sanitize(emailRaw);
+  const cidade   = window.gameOptimizations?.sanitizeInput ? window.gameOptimizations.sanitizeInput(cidadeRaw) : sanitize(cidadeRaw);
+  const whatsapp = window.gameOptimizations?.sanitizeInput ? window.gameOptimizations.sanitizeInput(whatsappRaw) : sanitize(whatsappRaw);
+  const cleanWhatsapp = whatsapp.replace(/\D/g, "");
 
-        // Validação de email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          exibirErro(registerErrorP, "Email inválido.");
-          notifications.show("Por favor, insira um email válido", "warning");
-          return;
-        }
+  // Obrigatórios
+  if (!nome || !email || !cleanWhatsapp || !estado || !cidade || !password || !confirmPass || !cepValue) {
+    exibirErro(registerErrorP, "Preencha todos os campos obrigatórios (incluindo CEP).");
+    notifications?.show("Todos os campos são obrigatórios", "warning");
+    return;
+  }
 
-        // Validação de WhatsApp
-        const cleanWhatsapp = whatsapp.replace(/\D/g, '');
-        if (cleanWhatsapp.length < 10 || cleanWhatsapp.length > 11) {
-          exibirErro(registerErrorP, "WhatsApp deve ter 10 ou 11 dígitos.");
-          notifications.show("WhatsApp inválido. Use formato: (11) 99999-9999", "warning");
-          return;
-        }
+  // CEP: 8 dígitos
+  if (!/^\d{8}$/.test(cepValue)) {
+    exibirErro(registerErrorP, "CEP inválido. Use 8 dígitos (ex.: 01311200).");
+    notifications?.show("CEP inválido. Use 8 dígitos.", "warning");
+    return;
+  }
 
-        // Validação de senha
-        if (password.length < 6) {
-          exibirErro(registerErrorP, "Senha deve ter pelo menos 6 caracteres.");
-          notifications.show("Senha muito curta. Mínimo 6 caracteres", "warning");
-          return;
-        }
+  // Nome: pelo menos 2 palavras
+  if (nome.split(' ').filter(Boolean).length < 2) {
+    exibirErro(registerErrorP, "Digite seu nome completo.");
+    notifications?.show("Por favor, digite seu nome completo", "warning");
+    return;
+  }
 
-        if (password !== confirmPass) {
-          exibirErro(registerErrorP, "As senhas não coincidem.");
-          notifications.show("As senhas não coincidem", "warning");
-          return;
-        }
+  // Email válido
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    exibirErro(registerErrorP, "Email inválido.");
+    notifications?.show("Por favor, insira um email válido", "warning");
+    return;
+  }
 
-        exibirErro(registerErrorP, "");
-        loadingEl.style.display = "block";
-        registerButton.disabled = true;
-        registerButton.textContent = "Cadastrando...";
+  // WhatsApp: 10 ou 11 dígitos
+  if (cleanWhatsapp.length < 10 || cleanWhatsapp.length > 11) {
+    exibirErro(registerErrorP, "WhatsApp deve ter 10 ou 11 dígitos.");
+    notifications?.show("WhatsApp inválido. Use formato: (11) 99999-9999", "warning");
+    return;
+  }
 
-        // Cria o usuário no Firebase Auth
-        firebase
-          .auth()
-          .createUserWithEmailAndPassword(email, password)
-          .then((cred) => {
-            const userId = cred.user.uid;
-            notifications.show("Conta criada! Salvando dados...", "info");
-            
-            // Salva os dados adicionais no Firestore
-            return firebase.firestore().collection("players").doc(userId).set({
-              email: email,
-              nome: nome,
-              whatsapp: cleanWhatsapp,
-              estado: estado,
-              cidade: cidade,
-              dataCadastro: firebase.firestore.FieldValue.serverTimestamp(),
-              nivelMax: 0,
-              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-              pontuacaoAcumulada: 0,
-              pontuacaoMaxima: 0,
-              quantidadePlays: 0,
-            });
-          })
-          .then(() => {
-            notifications.show("Cadastro realizado com sucesso! 🎉", "success");
-            // Faz login automático após salvar no Firestore
-            return firebase.auth().signInWithEmailAndPassword(email, password);
-          })
-          .then(() => {
-            const bgMusic = document.getElementById("bg-music");
-            // Pausa a música ao finalizar cadastro
-            bgMusic.pause();
-            bgMusic.currentTime = 0;
-            authScreen.style.display = "none";
-            logoutButton.style.display = "block";
-            pontosButton.style.display = "block";
-          })
-          .catch((erro) => {
-            let mensagem = erro.message;
-            if (erro.code === 'auth/email-already-in-use') {
-              mensagem = "Este email já está em uso. Tente fazer login.";
-            } else if (erro.code === 'auth/weak-password') {
-              mensagem = "Senha muito fraca. Use pelo menos 6 caracteres.";
-            } else if (erro.code === 'auth/invalid-email') {
-              mensagem = "Email inválido.";
-            }
-            exibirErro(registerErrorP, mensagem);
-            notifications.show(mensagem, "error");
-            console.error("Erro no cadastro:", erro);
-          })
-          .finally(() => {
-            loadingEl.style.display = "none";
-            registerButton.disabled = false;
-            registerButton.textContent = "Cadastrar";
+  // Senha
+  if (password.length < 6) {
+    exibirErro(registerErrorP, "Senha deve ter pelo menos 6 caracteres.");
+    notifications?.show("Senha muito curta. Mínimo 6 caracteres", "warning");
+    return;
+  }
+  if (password !== confirmPass) {
+    exibirErro(registerErrorP, "As senhas não coincidem.");
+    notifications?.show("As senhas não coincidem", "warning");
+    return;
+  }
+
+  exibirErro(registerErrorP, "");
+  loadingEl.style.display = "block";
+  registerButton.disabled = true;
+  registerButton.textContent = "Cadastrando...";
+
+  // Cria usuário e salva no Firestore (inclui CEP)
+  firebase.auth()
+    .createUserWithEmailAndPassword(email, password)
+    .then((cred) => {
+      const userId = cred.user.uid;
+      notifications?.show("Conta criada! Salvando dados...", "info");
+
+      return firebase.firestore()
+        .collection("players")
+        .doc(userId)
+        .set({
+          email: email,
+          nome: nome,
+          cep: cepValue,              // <<<<<< SALVA O CEP AQUI
+          whatsapp: cleanWhatsapp,
+          estado: estado,
+          cidade: cidade,
+          dataCadastro: firebase.firestore.FieldValue.serverTimestamp(),
+          nivelMax: 0,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          pontuacaoAcumulada: 0,
+          pontuacaoMaxima: 0,
+          quantidadePlays: 0
+        });
+    })
+    .then(() => {
+      notifications?.show("Cadastro realizado com sucesso! 🎉", "success");
+      // Faz login e inicia o jogo (usa rotina existente)
+      return firebase.auth().signInWithEmailAndPassword(email, password);
+    })
+    .then(() => {
+      const bgMusic = document.getElementById("bg-music");
+      bgMusic.pause(); bgMusic.currentTime = 0;
+      iniciarJogo();
+    })
+    .catch((erro) => {
+      let mensagem = erro.message;
+      if (erro.code === 'auth/email-already-in-use')  mensagem = "Este email já está em uso. Tente fazer login.";
+      else if (erro.code === 'auth/weak-password')    mensagem = "Senha muito fraca. Use pelo menos 6 caracteres.";
+      else if (erro.code === 'auth/invalid-email')     mensagem = "Email inválido.";
+      exibirErro(registerErrorP, mensagem);
+      notifications?.show(mensagem, "error");
+      console.error("Erro no cadastro:", erro);
+    })
+    .finally(() => {
+      loadingEl.style.display = "none";
+      registerButton.disabled = false;
+      registerButton.textContent = "Cadastrar";
           });
       });
 
@@ -1254,7 +1430,7 @@
           pontosButton.style.display = "block";
         } else {
           // Se não estiver logado, mostra formulário de login
-          authScreen.style.display = "flex";
+          if (firebase && firebase.auth && firebase.auth().currentUser) { authScreen.style.display = 'none'; } else { authScreen.style.display = 'flex'; }
           loginForm.style.display = "block";
           registerForm.style.display = "none";
           loginErrorP.textContent = "";
@@ -1460,97 +1636,61 @@
 
     <script>
       function updateStatsFirestore(score, level) {
-        const user = firebase.auth().currentUser;
-        if (!user) {
-          return;
-        }
-        const userId = user.uid;
-        const playerRef = firebase
-          .firestore()
-          .collection("players")
-          .doc(userId);
+  const user = firebase.auth().currentUser;
+  if (!user) return;
 
-        playerRef.get().then(async (doc) => {
-          if (!doc.exists) {
-            return;
-          }
+  const userId = user.uid;
+  const playerRef = firebase.firestore().collection("players").doc(userId);
 
-          const data = doc.data();
-          const prevNivelMax = data.nivelMax || 0;
-          const prevPontAcum = data.pontuacaoAcumulada || 0;
-          const prevPontMax = data.pontuacaoMaxima || 0;
-          const prevQtyPlays = data.quantidadePlays || 0;
+  playerRef.get().then(async (doc) => {
+    if (!doc.exists) return;
 
-          const newNivelMax = level > prevNivelMax ? level : prevNivelMax;
-          const newPontAcum = prevPontAcum + score;
-          const newPontMax = score > prevPontMax ? score : prevPontMax;
-          const newQtyPlays = prevQtyPlays + 1;
+    const data = doc.data();
+    const prevNivelMax = data.nivelMax || 0;
+    const prevPontAcum = data.pontuacaoAcumulada || 0;
+    const prevPontMax  = data.pontuacaoMaxima || 0;
+    const prevQtyPlays = data.quantidadePlays || 0;
 
-          // Analytics detalhados
-          const gameSession = {
-            score: score,
-            level: level,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            duration: Date.now() - (window.gameStartTime || Date.now()),
-            isNewRecord: score > prevPontMax
-          };
+    const newNivelMax = Math.max(level, prevNivelMax);
+    const newPontAcum = prevPontAcum + score;
+    const newPontMax  = Math.max(score, prevPontMax);
+    const newQtyPlays = prevQtyPlays + 1;
 
-          // Atualiza estatísticas principais
-          const updateData = {
-            dataUltimoPlay: firebase.firestore.FieldValue.serverTimestamp(),
-            nivelMax: newNivelMax,
-            pontuacaoAcumulada: newPontAcum,
-            pontuacaoMaxima: newPontMax,
-            quantidadePlays: newQtyPlays,
-            lastGameSession: gameSession
-          };
+    const gameSession = {
+      score, level,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      duration: Date.now() - (window.gameStartTime || Date.now()),
+      isNewRecord: score > prevPontMax
+    };
 
-          // Adiciona à coleção de sessões para analytics
-          const sessionsRef = firebase.firestore()
-            .collection('players')
-            .doc(userId)
-            .collection('sessions');
-          
-          await sessionsRef.add(gameSession);
+    const updateData = {
+      dataUltimoPlay: firebase.firestore.FieldValue.serverTimestamp(),
+      nivelMax: newNivelMax,
+      pontuacaoAcumulada: newPontAcum,
+      pontuacaoMaxima: newPontMax,
+      quantidadePlays: newQtyPlays,
+      lastGameSession: gameSession
+    };
 
-          // Atualiza documento principal
-          await playerRef.update(updateData);
+    const sessionsRef = firebase.firestore()
+      .collection('players').doc(userId).collection('sessions');
 
-          // Verifica conquistas
-          if (window.achievementSystem) {
-            const stats = {
-              pontuacaoMaxima: newPontMax,
-              pontuacaoAcumulada: newPontAcum,
-              quantidadePlays: newQtyPlays,
-              nivelMax: newNivelMax
-            };
-            
-            const gameStats = {
-              currentScore: score,
-              currentLevel: level,
-              isNewRecord: score > prevPontMax
-            };
+    await sessionsRef.add(gameSession);
+    await playerRef.update(updateData);
 
-            await window.achievementSystem.checkAchievements(stats, gameStats);
-          }
+    if (window.achievementSystem) {
+      await window.achievementSystem.checkAchievements(
+        { pontuacaoMaxima: newPontMax, pontuacaoAcumulada: newPontAcum, quantidadePlays: newQtyPlays, nivelMax: newNivelMax },
+        { currentScore: score, currentLevel: level, isNewRecord: score > prevPontMax }
+      );
+    }
 
-          // Notificação de novo recorde
-          if (score > prevPontMax && window.notifications) {
-            window.notifications.show(
-              `🎉 Novo recorde pessoal: ${score} pontos!`,
-              'success',
-              5000
-            );
-          }
-
-          console.log('✅ Estatísticas atualizadas com sucesso');
-        }).catch(err => {
-          console.error('❌ Erro ao atualizar estatísticas:', err);
-          if (window.notifications) {
-            window.notifications.show(
-              'Erro ao salvar pontuação. Verifique sua conexão.',
-              'error'
-            );
+    if (score > prevPontMax && window.notifications) {
+      window.notifications.show(`🎉 Novo recorde pessoal: ${score} pontos!`, 'success', 5000);
+    }
+  }).catch(err => {
+    console.error('❌ Erro ao atualizar estatísticas:', err);
+    window.notifications?.show('Erro ao salvar pontuação. Verifique sua conexão.', 'error');
           }
         });
       }
@@ -1630,5 +1770,21 @@
         }
       }
     </script>
-  </body>
+  
+    <!-- ========== SERVICE WORKER REGISTRATION (versioned cache) ========== -->
+    <script>
+      (function(){
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function() {
+            navigator.serviceWorker.register('sw.js')
+              .then(function(reg) {
+                console.log('[SW] Registered:', reg.scope || reg);
+              })
+              .catch(function(err){ console.warn('[SW] Registration failed:', err); });
+          });
+        }
+      })();
+    </script>
+
+</body>
 </html>

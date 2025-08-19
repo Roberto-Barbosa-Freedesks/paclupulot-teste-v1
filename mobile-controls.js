@@ -411,5 +411,9 @@
         sendCommand: sendDirectionCommand
     };
 
+    // Cleanup hook to avoid lingering intervals/listeners between sessions
+    window.addEventListener('game:cleanup', function(){ try { stopContinuousDirection(); } catch(e){} });
+    window.mobileControls.cleanup = function(){ try { stopContinuousDirection(); } catch(e){} };
+
 })();
 

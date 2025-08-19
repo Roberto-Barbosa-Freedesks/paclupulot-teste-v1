@@ -7522,8 +7522,8 @@ Actor.prototype.getStepSizeFromTable = (function(){
     var stepSizes = (
                          // LEVEL 1
     "1111111111111111" + // pac-man (normal)
-    "0111111111111111" + // ghosts (normal)
-    "1111211111112111" + // pac-man (fright)
+    "0110110101101101" + // ghosts (normal)
+    "2111211121112111" + // pac-man (fright)
     "0110110101101101" + // ghosts (fright)
     "0101010101010101" + // ghosts (tunnel)
     "1111111111111111" + // elroy 1
@@ -7531,8 +7531,8 @@ Actor.prototype.getStepSizeFromTable = (function(){
 
                          // LEVELS 2-4
     "1111211111112111" + // pac-man (normal)
-    "1111111121111111" + // ghosts (normal)
-    "1111211112111121" + // pac-man (fright)
+    "0110110110110111" + // ghosts (normal)
+    "2111211121112111" + // pac-man (fright)
     "0110110110110111" + // ghosts (fright)
     "0110101011010101" + // ghosts (tunnel)
     "1111211111112111" + // elroy 1

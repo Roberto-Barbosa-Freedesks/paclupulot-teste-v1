@@ -53,9 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
           // Filtro: só exibe nomes com pelo menos 2 palavras e sem caracteres inválidos/suspeitos
           if (
           typeof d.nome === 'string' &&
-          d.nome.trim().split(' ').length >= 2 &&           // ao menos 2 palavras
-          /^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$/.test(d.nome) &&           // só letras e espaços
-          !/teste/i.test(d.nome) &&                          // excluir “teste”
           pos <= 10 &&
           (d.pontuacaoMaxima ?? 0) > 0
           ) {
@@ -115,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
             email: email,
             nome: name,
             whatsapp: whatsapp,
+            cep: document.getElementById("register-cep").value,
             estado: document.getElementById("register-state").value,
             cidade: document.getElementById("register-city-input").value,
             dataCadastro: firebase.firestore.FieldValue.serverTimestamp(),
