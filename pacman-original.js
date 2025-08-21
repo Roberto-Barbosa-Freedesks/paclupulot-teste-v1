@@ -1,5 +1,17 @@
 (function(){
 
+// Detect if the user is on a mobile/touch device. Pac‑Lúpulo utiliza sprites diferentes
+// para o estado "assustado" dos fantasmas. Em alguns navegadores móveis a linha
+// correspondente do spritesheet pode não ser renderizada corretamente, fazendo com que
+// os fantasmas "sumam" quando o power‑up de lúpulo é ativado. Para evitar que eles
+// desapareçam completamente no mobile, tratamos o estado scared como falso em telas
+// touch, de forma que eles continuem visíveis (mesmo que não mudem de cor).
+var isMobile = (function(){
+    if (typeof navigator === 'undefined') return false;
+    var ua = navigator.userAgent || navigator.vendor || window.opera;
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+})();
+
 // ——— Custom Avatars: preload PNGs e helper de rotação/flip ———
 var imgForasteira = new Image(); imgForasteira.src = 'img/forasteira.png';
 var imgIpazero    = new Image(); imgIpazero.src    = 'img/ipazero.png';
@@ -2949,11 +2961,13 @@ var atlas = (function(){
 
     var copyGhostSprite = function(destCtx,x,y,frame,dirEnum,scared,flash,eyes_only,color) {
         var row,col;
+        // Em dispositivos móveis, ignoramos o estado "scared" para evitar sprites vazios.
+        var effectiveScared = isMobile ? false : scared;
         if (eyes_only) {
             row = 5;
             col = dirEnum;
         }
-        else if (scared) {
+        else if (effectiveScared) {
             row = 5;
             col = flash ? 6 : 4;
             col += frame;
@@ -2981,7 +2995,9 @@ var atlas = (function(){
     };
 
     var copyMuppetSprite = function(destCtx,x,y,frame,dirEnum,scared,flash,eyes_only,color) {
-        if (scared) {
+        // Em dispositivos móveis, suprimimos o modo assustado para manter a renderização visível
+        var effectiveScared = isMobile ? false : scared;
+        if (effectiveScared) {
             if (flash) {
                 copyFruitSprite(destCtx,x,y,"cookieface");
             }
@@ -2990,17 +3006,19 @@ var atlas = (function(){
             }
         }
         else {
-            copyGhostSprite(destCtx,x,y,frame,dirEnum,scared,flash,eyes_only,color);
+            copyGhostSprite(destCtx,x,y,frame,dirEnum,effectiveScared,flash,eyes_only,color);
         }
     };
 
     var copyMonsterSprite = function(destCtx,x,y,frame,dirEnum,scared,flash,eyes_only,color) {
         var row,col;
+        // para mobile, não desenhar o sprite assombrado (vazio)
+        var effectiveScared = isMobile ? false : scared;
         if (eyes_only) {
             row = 13;
             col = dirEnum;
         }
-        else if (scared) {
+        else if (effectiveScared) {
             row = 13;
             col = flash ? 6 : 4;
             col += frame;

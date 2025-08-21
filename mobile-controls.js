@@ -6,6 +6,16 @@
     // Variáveis de controle
     let touchControlsEnabled = false;
     let isSwipeInProgress = false;
+            const absX = Math.abs(dx), absY = Math.abs(dy);
+            if (absX < DEADZONE && absY < DEADZONE) return;
+            let dir = null;
+            if (absX > absY * 1.15) {
+                dir = (dx > 0) ? 'DIR_RIGHT' : 'DIR_LEFT';
+            } else if (absY > absX * 1.15) {
+                dir = (dy > 0) ? 'DIR_DOWN' : 'DIR_UP';
+            }
+            if (dir) sendDirectionCommand(dir);
+    
     let lastTouchTime = 0;
     let currentDirection = null;
     let directionInterval = null;
@@ -98,8 +108,8 @@
         controlsContainer.id = 'mobile-controls';
         controlsContainer.style.cssText = `
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+            right: calc(20px + env(safe-area-inset-right, 0px));
             z-index: 2000;
             display: none;
             flex-direction: column;
@@ -107,7 +117,9 @@
             opacity: 0.9;
             transition: opacity 0.3s ease;
             user-select: none;
+            touch-action: none;
             -webkit-user-select: none;
+            touch-action: none;
             -webkit-touch-callout: none;
         `;
 
@@ -116,8 +128,8 @@
         dpadContainer.id = 'virtual-dpad';
         dpadContainer.style.cssText = `
             position: relative;
-            width: 140px;
-            height: 140px;
+            width: 168px;
+            height: 168px;
             display: block;
             margin: 10px auto;
             background: rgba(0, 0, 0, 0.3);
@@ -140,8 +152,8 @@
             button.dataset.direction = dir.dir;
             button.style.cssText = `
                 position: absolute;
-                width: 45px;
-                height: 45px;
+                width: 56px;
+                height: 56px;
                 border-radius: 50%;
                 background: rgba(245, 217, 34, 0.9);
                 border: 3px solid #000;
@@ -204,8 +216,8 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 30px;
-            height: 30px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             background: rgba(0, 0, 0, 0.5);
             border: 2px solid #f5d922;
@@ -265,6 +277,16 @@
                           (!pontosScreen || pontosScreen.style.display === 'none');
         
         controls.style.display = shouldShow ? 'flex' : 'none';
+        // Auto-ocultar após inatividade (4s); reaparecer ao próximo toque
+        try { if (window.__dpadHideTimer) clearTimeout(window.__dpadHideTimer); } catch(e){}
+        if (shouldShow) {
+            controls.style.opacity = '0.9';
+            window.__dpadHideTimer = setTimeout(() => {
+                controls.style.opacity = '0';
+                setTimeout(() => { controls.style.display = 'none'; }, 300);
+            }, 4000);
+        }
+    
         
         if (shouldShow) {
             console.log('🎮 Controles mobile ativados');
@@ -282,8 +304,13 @@
         let touchStartY = 0;
         let touchEndX = 0;
         let touchEndY = 0;
+        const DEADZONE = 24;
 
         canvas.addEventListener('touchstart', function(e) {
+            // Reaparece D-Pad ao primeiro toque
+            showMobileControlsIfNeeded();
+            try { controls = document.getElementById('mobile-controls'); if (controls) { controls.style.display='flex'; controls.style.opacity='0.9'; } } catch(e){}
+
             e.preventDefault();
             if (e.touches.length !== 1) return;
             

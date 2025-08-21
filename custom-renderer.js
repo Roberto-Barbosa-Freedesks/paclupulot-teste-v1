@@ -26,22 +26,61 @@
     canecaLoaded = true;
   };
 
+  // === Ajustes de escala com base no tileSize e cache offscreen para performance ===
+  let _cache = {
+    lastTile: null,
+    caneca: null,
+    lupulo: null
+  };
+
+  function ensureCaches() {
+    const ts = (typeof tileSize !== 'undefined' && tileSize) ? tileSize : 18;
+    if (_cache.lastTile === ts) return;
+    _cache.lastTile = ts;
+
+    // cria imagens offscreen proporcionais ao tile
+    const mk = (img, mul) => {
+      const size = Math.max(1, Math.round(ts * mul));
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      const cx = c.getContext('2d');
+      cx.imageSmoothingEnabled = true;
+      cx.drawImage(img, 0, 0, size, size);
+      return {canvas: c, size};
+    };
+
+    if (canecaImage && canecaImage.complete) _cache.caneca = mk(canecaImage, 2); // energizer ~2× tile
+    if (lupuloImage && lupuloImage.complete) _cache.lupulo = mk(lupuloImage, 2); // scared ghost/pretzel ~2× tile
+  }
+
+  function drawImageScaledCentered(ctx, imgOrCanvas, x, y, size) {
+    const half = size / 2;
+    ctx.drawImage(imgOrCanvas, Math.floor(x - half), Math.floor(y - half), size, size);
+  }
+
+
   // 4. Função para desenhar avatares (mantenha igual)
   function drawAvatar(ctx, x, y, dirEnum, img) {
-    const halfW = img.width / 2;
-    const halfH = img.height / 2;
+    ensureCaches();
+    const ts = (typeof tileSize !== 'undefined' && tileSize) ? tileSize : 18;
+    const size = Math.max(1, Math.round(ts * 2));
+    const halfW = size / 2;
+    const halfH = size / 2;
     ctx.save();
     ctx.translate(Math.floor(x), Math.floor(y));
     if (dirEnum === 2) ctx.scale(-1, 1);
     else if (dirEnum === 1) ctx.rotate(Math.PI / 2);
     else if (dirEnum === 3) ctx.rotate(-Math.PI / 2);
-    ctx.drawImage(img, -halfW, -halfH);
+    ctx.drawImage(img, -halfW, -halfH, size, size);
     ctx.restore();
   }
 
   // 5. ADICIONE ESTA NOVA FUNÇÃO - Para desenhar canecas
   function drawCaneca(ctx, x, y) {
+    ensureCaches();
+    const ts = (typeof tileSize !== 'undefined' && tileSize) ? tileSize : 18;
     if (canecaLoaded) {
+      const off = _cache.caneca;
       const size = tileSize * 1.5; // Tamanho da caneca (ajuste se necessário)
       ctx.save();
       ctx.translate(Math.floor(x), Math.floor(y));
@@ -73,11 +112,15 @@
     const originalDrawGhostSprite = atlas.drawGhostSprite;
     atlas.drawGhostSprite = function(ctx, x, y, frame, dirEnum, scared, isFlash, eyesOnly, color) {
       if (scared) {
-        const halfW = lupuloImage.width / 2;
-        const halfH = lupuloImage.height / 2;
+        ensureCaches();
+        const ts = (typeof tileSize !== 'undefined' && tileSize) ? tileSize : 18;
+        const off = _cache.lupulo;
+        const size = Math.max(1, Math.round(ts*2));
+        const halfW = size / 2;
+        const halfH = size / 2;
         ctx.save();
         ctx.translate(Math.floor(x), Math.floor(y));
-        ctx.drawImage(lupuloImage, -halfW, -halfH);
+        if (off) { ctx.drawImage(off.canvas, -halfW, -halfH); } else { ctx.drawImage(lupuloImage, -halfW, -halfH, size, size); }
         ctx.restore();
       } else {
         originalDrawGhostSprite(ctx, x, y, frame, dirEnum, scared, isFlash, eyesOnly, color);
@@ -105,7 +148,7 @@
         const size = typeof tileSize !== "undefined" ? tileSize * 2 : 36;
         ctx.save();
         ctx.translate(Math.floor(x), Math.floor(y));
-        ctx.drawImage(lupuloImage, -size / 2, -size / 2, size, size);
+        if (_cache.lupulo) { ctx.drawImage(_cache.lupulo.canvas, -_cache.lupulo.size/2, -_cache.lupulo.size/2); } else { ctx.drawImage(lupuloImage, -size / 2, -size / 2, size, size); }
         ctx.restore();
       } else {
         originalDrawFruitSprite(ctx, x, y, fruitType);

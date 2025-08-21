@@ -103,7 +103,42 @@ class AchievementSystem {
     };
     
     this.userAchievements = new Set();
+    this._pendingQueue = new Set();
+    this._saveTimer = null;
     this.loadUserAchievements();
+
+    // Tenta reenviar conquistas pendentes se voltar a ficar online
+    window.addEventListener('online', () => this._flushPendingQueue());
+  }
+
+  
+  _scheduleSave() {
+    if (this._saveTimer) clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this._flushPendingQueue(), 800);
+  }
+
+  async _flushPendingQueue() {
+    if (!this._pendingQueue || this._pendingQueue.size === 0) return;
+    const user = firebase.auth().currentUser;
+    if (!user) return;
+
+    const ids = Array.from(this._pendingQueue);
+    try {
+      await firebase.firestore()
+        .collection('players')
+        .doc(user.uid)
+        .update({
+          achievements: firebase.firestore.FieldValue.arrayUnion(...ids),
+          lastAchievementUpdate: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      ids.forEach(id => this._pendingQueue.delete(id));
+      ids.forEach(id => this.userAchievements.add(id));
+    } catch (err) {
+      console.error('Erro ao sincronizar conquistas pendentes:', err);
+      try {
+        localStorage.setItem('pending_achievements', JSON.stringify(ids));
+      } catch(_) {}
+    }
   }
 
   async loadUserAchievements() {
@@ -120,6 +155,10 @@ class AchievementSystem {
         const data = doc.data();
         this.userAchievements = new Set(data.achievements || []);
       }
+      try {
+        const pend = JSON.parse(localStorage.getItem('pending_achievements') || '[]');
+        if (Array.isArray(pend)) pend.forEach(id => this._pendingQueue.add(id));
+      } catch(_) {}
     } catch (error) {
       console.error('Erro ao carregar conquistas:', error);
     }
@@ -139,27 +178,30 @@ class AchievementSystem {
     }
 
     if (newAchievements.length > 0) {
-      await this.saveAchievements();
+      newAchievements.forEach(a => this._pendingQueue.add(a.id));
+      this._scheduleSave();
       this.showAchievementNotifications(newAchievements);
     }
 
     return newAchievements;
   }
 
-  async saveAchievements() {
+  async saveAchievements(achievementsList = []) {
     const user = firebase.auth().currentUser;
     if (!user) return;
+    const ids = achievementsList.length ? achievementsList.map(a => a.id) : Array.from(this.userAchievements);
 
     try {
       await firebase.firestore()
         .collection('players')
         .doc(user.uid)
-        .update({
-          achievements: Array.from(this.userAchievements),
+         .update({
+          achievements: firebase.firestore.FieldValue.arrayUnion(...ids),
           lastAchievementUpdate: firebase.firestore.FieldValue.serverTimestamp()
         });
     } catch (error) {
       console.error('Erro ao salvar conquistas:', error);
+      try { localStorage.setItem('pending_achievements', JSON.stringify(ids)); } catch(_) {}
     }
   }
 
@@ -301,7 +343,8 @@ class AchievementSystem {
 }
 
 // Adiciona animações CSS para conquistas
-const achievementStyle = document.createElement('style');
+let achievementStyle = document.getElementById('achievement-style');
+if (!achievementStyle) { achievementStyle = document.createElement('style'); achievementStyle.id = 'achievement-style'; }
 achievementStyle.textContent = `
   @keyframes bounceIn {
     0% { transform: scale(0.3); opacity: 0; }
@@ -314,8 +357,22 @@ achievementStyle.textContent = `
     to { opacity: 0; }
   }
 `;
-document.head.appendChild(achievementStyle);
+if (!document.getElementById('achievement-style')) document.head.appendChild(achievementStyle);
 
 // Instância global
 window.achievementSystem = new AchievementSystem();
+
+  /** Libera programaticamente uma conquista (id string); idempotente */
+  async grant(id, statsSnapshot = null) {
+    if (!id || this.userAchievements.has(id)) return false;
+    const def = this.achievements[id];
+    if (!def) return false;
+    try {
+      if (def.condition && statsSnapshot && !def.condition(statsSnapshot)) return false;
+    } catch(_) {}
+    this._pendingQueue.add(id);
+    this._scheduleSave();
+    this.showAchievementNotifications([def]);
+    return true;
+  }
 

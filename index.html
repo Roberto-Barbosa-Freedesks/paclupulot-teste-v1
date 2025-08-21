@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
     <title>Pac-Lúpulo da Cervejaria CAMPINAS</title>
@@ -457,6 +457,19 @@
         }
       });
     </script>
+  
+    <style>
+      /* Acessibilidade: foco visível em botões fixos do topo */
+      #pontos-button:focus-visible, #logout-button:focus-visible {
+        outline: 3px solid #f5d922;
+        outline-offset: 2px;
+      }
+      /* Respeita usuários com preferência por menos animação */
+      @media (prefers-reduced-motion: reduce) {
+        * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+      }
+    </style>
+
   </head>
 
   <body>
@@ -464,7 +477,7 @@
     <div style="font-family: &quot;ArcadeR&quot;"></div>
 
     <!-- ========== ÁUDIO DE FUNDO (loop) ========== -->
-    <audio id="bg-music" src="sounds/coffee-break-music.mp3" loop></audio>
+    <audio id="bg-music" src="sounds/coffee-break-music.mp3" loop aria-hidden="true"></audio>
     <!-- =============================================== -->
 
     <!-- ========== TELA START ========== -->
@@ -836,11 +849,11 @@
     "></div>
 
     <!-- Botões de controle -->
-    <button id="logout-button" style="display: none;">Logout</button>
-    <button id="pontos-button" style="display: none;">Pontos</button>
+    <button id="logout-button" type="button" aria-label="Sair do jogo" title="Sair" style="display: none;">Logout</button>
+    <button id="pontos-button" type="button" aria-label="Abrir tela de pontos e ranking" title="Pontos" style="display: none;">Pontos</button>
 
     <!-- Canvas do jogo -->
-    <canvas id="canvas"></canvas>
+    <canvas id="canvas" tabindex="0" aria-label="Área do jogo Pac-Lúpulo"></canvas>
     <canvas id="atlas" style="display: none"></canvas>
 
     <!-- Importa scripts do jogo -->

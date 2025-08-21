@@ -34,10 +34,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     firebase.firestore().collection('players').doc(user.uid).get()
     .then(doc => {
-    if (!doc.exists) throw new Error('Doc não existe');
-    const data = doc.data();
-    document.getElementById('pontuacao-acumulada').textContent = d.pontuacaoAcumulada ?? 0;
-    document.getElementById('pontuacao-maxima').textContent   = d.pontuacaoMaxima   ?? 0;
+      if (!doc.exists) throw new Error('Doc não existe');
+      const data = doc.data() || {};
+      document.getElementById('pontuacao-acumulada').textContent = (data.pontuacaoAcumulada ?? 0).toString();
+      document.getElementById('pontuacao-maxima').textContent   = (data.pontuacaoMaxima   ?? 0).toString();
     })
     .catch(err => console.error('Erro ao atualizar pontos:', err));
 

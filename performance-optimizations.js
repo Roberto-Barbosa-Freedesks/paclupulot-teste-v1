@@ -3,6 +3,74 @@
 (function() {
     'use strict';
 
+    // === FPS Governor & Visibility Handling ===
+    let __preferredUPS = 60;
+    let __prevUPS = 60;
+    let __visibilityUPS = 1; // enquanto em segundo plano, mantém loop quase ocioso
+
+    async function chooseUPS() {
+        let ups = 60;
+
+        // Conexão lenta → reduz UPS
+        try {
+            const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            if (c) {
+                if (c.saveData) ups = Math.min(ups, 30);
+                if (c.effectiveType && /(^|-)2g$/.test(c.effectiveType)) ups = Math.min(ups, 30);
+            }
+        } catch(e){}
+
+        // Memória do dispositivo muito baixa → reduz UPS
+        try {
+            if (navigator.deviceMemory && navigator.deviceMemory <= 2) ups = Math.min(ups, 45);
+        } catch(e){}
+
+        // Battery API: nível baixo e não carregando → reduz UPS
+        try {
+            if (navigator.getBattery) {
+                const b = await navigator.getBattery();
+                if (!b.charging && b.level <= 0.2) ups = Math.min(ups, 30);
+            }
+        } catch(e){}
+
+        __preferredUPS = ups;
+        return ups;
+    }
+
+    function applyUPS(ups) {
+        try {
+            if (window.executive && typeof window.executive.setUpdatesPerSecond === 'function') {
+                window.executive.setUpdatesPerSecond(ups);
+                __prevUPS = ups;
+                console.log('⚙️ UPS ajustado para', ups);
+            }
+        } catch(e){ console.warn('Não foi possível ajustar UPS:', e); }
+    }
+
+    function setupVisibilityHandling() {
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                applyUPS(__visibilityUPS);
+                // pausa música de fundo, se existir
+                const bg = document.getElementById('bg-music');
+                try { if (bg && !bg.paused) bg.pause(); } catch(e){}
+            } else {
+                applyUPS(__preferredUPS || 60);
+                // tenta retomar música, se permitido
+                const bg = document.getElementById('bg-music');
+                try { if (bg && bg.paused) { bg.play().catch(()=>{}); } } catch(e){}
+            }
+        });
+    }
+
+    function setupPassiveListeners() {
+        try {
+            window.addEventListener('scroll', ()=>{}, {passive:true});
+            window.addEventListener('wheel', ()=>{}, {passive:true});
+        } catch(e){}
+    }
+
+
     // Debounce function para otimizar eventos
     function debounce(func, wait) {
         let timeout;
@@ -321,6 +389,14 @@
 
     // Inicialização das otimizações
     function initOptimizations() {
+
+        // Governação de FPS/UPS adaptativa
+        try { 
+            chooseUPS().then(applyUPS);
+            setupVisibilityHandling();
+            setupPassiveListeners();
+        } catch(e){}
+
         console.log('🚀 Inicializando otimizações de performance...');
         
         performanceMonitor.startTimer('initialization');
