@@ -143,6 +143,7 @@
       }
       
       /* Button Styles */
+      .btn--secondary { filter: saturate(0.9) contrast(1.05); }
       .btn {
         padding: 12px 24px;
         margin: 8px;
@@ -171,6 +172,7 @@
       }
       
       /* Input Styles */
+      .locked { opacity: 0.8; background:#1c1c1c; }
       .form-input {
         display: block;
         width: 100%;
@@ -849,8 +851,8 @@
     "></div>
 
     <!-- Botões de controle -->
-    <button id="logout-button" type="button" aria-label="Sair do jogo" title="Sair" style="display: none;">Logout</button>
-    <button id="pontos-button" type="button" aria-label="Abrir tela de pontos e ranking" title="Pontos" style="display: none;">Pontos</button>
+    <button id="logout-button" type="button" aria-label="Sair do jogo" title="Sair" style="display: none;" class="btn btn--secondary">Logout</button>
+    <button id="pontos-button" type="button" aria-label="Abrir tela de pontos e ranking" title="Pontos" style="display: none;" class="btn btn--secondary">Pontos</button>
 
     <!-- Canvas do jogo -->
     <canvas id="canvas" tabindex="0" aria-label="Área do jogo Pac-Lúpulo"></canvas>
@@ -1799,5 +1801,6 @@
       })();
     </script>
 
+  <script src="audio-unlock.js"></script>
 </body>
 </html>

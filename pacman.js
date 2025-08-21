@@ -2,6 +2,111 @@
 
 // 1) CONFIRMA que o DOM já está carregado antes de usar elementos (por via das dúvidas)
 document.addEventListener('DOMContentLoaded', () => {
+  // CHATGPT PATCH: CEP AutoFill via ViaCEP (readOnly/lock)
+  (function setupCepAutofill(){
+    const cepInput = document.getElementById('register-cep');
+    const stateSel = document.getElementById('register-state');
+    const cityInput = document.getElementById('register-city-input');
+    if (!cepInput || !stateSel || !cityInput) return;
+
+    // Popula UFs se vazio (sem dependências)
+    const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+    if (stateSel.options.length <= 1) {
+      UFS.forEach(uf => {
+        const opt = document.createElement('option');
+        opt.value = uf; opt.textContent = uf;
+        stateSel.appendChild(opt);
+      });
+    }
+
+    function onlyDigits(s){ return (s||'').replace(/\D/g, ''); }
+    function formatCEP(s){ s = onlyDigits(s).slice(0,8); return s.length > 5 ? s.slice(0,5) + "-" + s.slice(5) : s; }
+
+    let lastQuery = "";
+    let controller = null;
+
+    function unlockFields() {
+      cityInput.readOnly = false;
+      stateSel.disabled = false;
+      cityInput.classList.remove('locked');
+      stateSel.classList.remove('locked');
+    }
+
+    function lockFields() {
+      cityInput.readOnly = true;
+      stateSel.disabled = true;
+      cityInput.classList.add('locked');
+      stateSel.classList.add('locked');
+    }
+
+    function showCepMessage(msg, isError){
+      const el = document.getElementById('register-error');
+      if (el) el.textContent = msg || "";
+    }
+
+    async function fetchWithTimeout(url, ms){
+      const c = new AbortController();
+      const id = setTimeout(() => c.abort(), ms);
+      try {
+        const res = await fetch(url, { signal: c.signal });
+        clearTimeout(id);
+        return res;
+      } catch(e){
+        clearTimeout(id);
+        throw e;
+      }
+    }
+
+    async function tryViaCEP(rawDigits){
+      if (controller) { try{ controller.abort(); }catch(e){} }
+      controller = new AbortController();
+      const url = "https://viacep.com.br/ws/" + rawDigits + "/json/";
+      const res = await fetchWithTimeout(url, 4000).catch(()=>null);
+      if (!res) throw new Error('timeout');
+      if (!res.ok) throw new Error('http');
+      const data = await res.json();
+      if (data && data.erro) throw new Error('notfound');
+      return data; // { uf, localidade, ... }
+    }
+
+    cepInput.addEventListener('input', async function(){
+      // máscara
+      const formatted = formatCEP(cepInput.value);
+      if (cepInput.value !== formatted) {
+        const pos = cepInput.selectionStart;
+        cepInput.value = formatted;
+        try { cepInput.setSelectionRange(pos, pos); } catch(e){}
+      }
+
+      const digits = (formatted || "").replace(/\D/g, "");
+      if (digits.length !== 8) { showCepMessage(""); unlockFields(); return; }
+      if (digits === lastQuery) return; // evita chamadas duplicadas
+      lastQuery = digits;
+
+      // Consulta ViaCEP resiliente (com retries simples)
+      const attempts = [0, 300, 600];
+      let ok = false, data = null;
+      for (let i=0;i<attempts.length && !ok;i++){
+        if (i>0) await new Promise(r=>setTimeout(r, attempts[i]));
+        try { data = await tryViaCEP(digits); ok = true; } catch(e){}
+      }
+
+      if (ok && data) {
+        // Preenche e bloqueia
+        const uf = (data.uf || "").toUpperCase();
+        const city = data.localidade || "";
+        if (uf) stateSel.value = uf;
+        cityInput.value = city;
+        lockFields();
+        showCepMessage("");
+      } else {
+        // Falha → permite edição manual + mensagem
+        unlockFields();
+        showCepMessage("Não foi possível preencher cidade/estado automaticamente. Preencha manualmente.", true);
+      }
+    });
+  })();
+
   // 2) Variável de controle para não carregar múltiplas vezes
   let gameLoaded = false;
 

@@ -260,3 +260,10 @@ Esta versão representa uma revisão técnica completa do jogo, transformando-o 
 
 **Desenvolvido com ❤️ pela equipe FreeDESKS para a Cervejaria Campinas**
 
+
+
+## 2025-08-21 20:22:10 — Correções técnicas (ChatGPT)
+- A: Fantasmas visíveis no estado frightened (patch em custom-renderer.js) com paleta azul/piscar e alpha garantido.
+- B: Desbloqueio e retomada de áudio no iOS/Safari via `audio-unlock.js` (primeiro gesto + visibilitychange).
+- C: CEP → Auto-preenchimento de Cidade/Estado com ViaCEP e bloqueio dos campos; máscara de CEP e retries.
+- D: Desktop — Padronização visual dos botões “PONTOS” e “LOGOUT” com classe `.btn .btn--secondary`.

@@ -154,5 +154,37 @@
         originalDrawFruitSprite(ctx, x, y, fruitType);
       }
     };
+
+  // === CHATGPT PATCH: frightened visibility enforcement ===
+  // Garante que fantasmas em estado frightened nunca "sumam" (alpha = 0) e
+  // aplica paleta azul/piscar sem alterar a ordem de desenho do renderer.
+  try {
+    if (window.atlas && typeof atlas.drawGhostSprite === 'function') {
+      const __origDrawGhostSprite = atlas.drawGhostSprite;
+      atlas.drawGhostSprite = function(ctx, x, y, frame, faceDirEnum, scared, isFlash, eyesOnly, color) {
+        // Força alpha visível
+        const prevAlpha = ctx.globalAlpha;
+        ctx.globalAlpha = 1;
+
+        // Mantém olhos-only como está; caso "scared", ajusta cor para azul/piscar
+        let useColor = color;
+        if (scared && !eyesOnly) {
+          // Azul padrão frightened; alterna com branco quando piscar
+          const BLUE = "#2156F3";
+          if (isFlash) {
+            // Alterna a cada ~120ms usando high-res timer se disponível
+            const t = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+            useColor = Math.floor(t / 120) % 2 ? "#FFFFFF" : BLUE;
+          } else {
+            useColor = BLUE;
+          }
+        }
+
+        __origDrawGhostSprite.call(atlas, ctx, x, y, frame, faceDirEnum, scared, isFlash, eyesOnly, useColor);
+        ctx.globalAlpha = prevAlpha;
+      };
+    }
+  } catch (e) { console.warn('Ghost frightened visibility patch falhou:', e); }
+
   });
 })();
