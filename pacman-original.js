@@ -2962,7 +2962,7 @@ var atlas = (function(){
     var copyGhostSprite = function(destCtx,x,y,frame,dirEnum,scared,flash,eyes_only,color) {
         var row,col;
         // Em dispositivos móveis, ignoramos o estado "scared" para evitar sprites vazios.
-        var effectiveScared = isMobile ? false : scared;
+        var effectiveScared = scared;
         if (eyes_only) {
             row = 5;
             col = dirEnum;
@@ -2996,7 +2996,7 @@ var atlas = (function(){
 
     var copyMuppetSprite = function(destCtx,x,y,frame,dirEnum,scared,flash,eyes_only,color) {
         // Em dispositivos móveis, suprimimos o modo assustado para manter a renderização visível
-        var effectiveScared = isMobile ? false : scared;
+        var effectiveScared = scared;
         if (effectiveScared) {
             if (flash) {
                 copyFruitSprite(destCtx,x,y,"cookieface");
@@ -3013,7 +3013,7 @@ var atlas = (function(){
     var copyMonsterSprite = function(destCtx,x,y,frame,dirEnum,scared,flash,eyes_only,color) {
         var row,col;
         // para mobile, não desenhar o sprite assombrado (vazio)
-        var effectiveScared = isMobile ? false : scared;
+        var effectiveScared = scared;
         if (eyes_only) {
             row = 13;
             col = dirEnum;
