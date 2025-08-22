@@ -163,9 +163,18 @@ var DEBUG = false;
 /* Sound handlers added by Dr James Freeman who was sad such a great reverse was a silent movie  */
 
 var audio = new preloadAudio();
+try {
+  window.__paclupuloAudio = audio;
+  window.dispatchEvent(new Event("gameaudio-ready"));
+} catch(e) {}
 
 function audioTrack(url, volume) {
     var audio = new Audio(url);
+    try {
+  audio.setAttribute("preload","auto");
+  audio.setAttribute("playsinline","");
+  audio.setAttribute("webkit-playsinline","");
+} catch(e) {}
     if (volume) audio.volume = volume;
     audio.load();
     var looping = false;
