@@ -175,15 +175,15 @@
       .locked { opacity: 0.8; background:#1c1c1c; }
       .form-input {
         display: block;
-        width: 100%;
+        width: 90%;
         margin: 10px 0;
         padding: 12px;
         border: 2px solid #333;
-        border-radius: 6px;
+        border-radius: 4px;
         background: #222;
         color: #fff;
         font-family: inherit;
-        font-size: 14px;
+        font-size: 12px;
         transition: border-color 0.3s ease;
       }
       
@@ -202,19 +202,19 @@
         position: fixed;
         top: 15px;
         z-index: 2001;
-        padding: 8px 17px;
-        font-size: 9px;
+        padding: 6px 12px;
+        font-size: 7px;
         font-family: inherit;
         background: rgba(34, 34, 34, 0.95);
         color: #fff;
         border: 2px solid #f5d922;
-        border-radius: 6px;
+        border-radius: 4px;
         cursor: pointer;
         backdrop-filter: blur(5px);
         transition: all 0.3s ease;
       }
       
-      #pontos-button { right: 120px; }
+      #pontos-button { right: 95px; }
       #logout-button { right: 15px; }
       
       #pontos-button:hover, #logout-button:hover {
@@ -1200,8 +1200,6 @@
           // Esconde a tela de start
           startScreen.style.display = "none";
           if (firebase && firebase.auth && firebase.auth().currentUser) { authScreen.style.display = 'none'; } else { authScreen.style.display = 'flex'; }
-          bgMusic.pause();
-          bgMusic.currentTime = 0;
         }
 
         startScreen.addEventListener("click", handleStartClick);
@@ -1480,7 +1478,10 @@
       const rankingListDiv = document.getElementById("ranking-list");
 
       pontosButton.addEventListener("click", async function () {
-        pontosScreen.style.display = "flex";
+        // Pausa o jogo e áudios como no botão MENU
+        try { window.paclupuloPauseGame && window.paclupuloPauseGame(); } catch(e){}
+        try { window.__paclupuloAudio && window.__paclupuloAudio.silence && window.__paclupuloAudio.silence(true); } catch(e){}
+pontosScreen.style.display = "flex";
         document.getElementById("canvas").style.display = "none";
         logoutButton.style.display = "none";
         pontosButton.style.display = "none";
@@ -1646,7 +1647,8 @@
       });
 
       backToGameButton.addEventListener("click", function () {
-        pontosScreen.style.display = "none";
+        try { window.paclupuloResumeGame && window.paclupuloResumeGame(); } catch(e){}
+pontosScreen.style.display = "none";
         document.getElementById("canvas").style.display = "block";
         logoutButton.style.display = "block";
         pontosButton.style.display = "block";
@@ -1741,11 +1743,8 @@
 
     <script>
       function iniciarJogo() {
-        try { window.__gameRunning = true; } catch(e){}
         try { var __b = document.getElementById('bg-music'); if(__b){ __b.pause(); __b.currentTime = 0; } } catch(e){}
-        try { window.primeGameAudio && window.primeGameAudio(); } catch(e){}
-
-        try {
+try {
           document.getElementById("auth-screen").style.display = "none";
           document.getElementById("logout-button").style.display = "block";
           document.getElementById("pontos-button").style.display = "block";
@@ -1810,5 +1809,33 @@
     </script>
 
   <script src="audio-unlock.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  try {
+    const startScreen = document.getElementById("start-screen");
+    const authScreen  = document.getElementById("auth-screen");
+    const bgMusic     = document.getElementById("bg-music");
+    function __pp_handleStartClick() {
+      try {
+        if (bgMusic && bgMusic.paused) {
+          bgMusic.play().catch(function (err) { console.warn("Falha ao iniciar música:", err); });
+        }
+        window.dispatchEvent(new Event('game:cleanup'));
+        if (startScreen) startScreen.style.display = "none";
+        if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
+          if (authScreen) authScreen.style.display = 'none';
+        } else {
+          if (authScreen) authScreen.style.display = 'flex';
+        }
+      } catch(e){}
+    }
+    if (startScreen) {
+      startScreen.addEventListener("click", __pp_handleStartClick);
+      startScreen.addEventListener("touchstart", function(e){ e.preventDefault(); __pp_handleStartClick(); });
+    }
+  } catch(e){}
+});
+</script>
 </body>
 </html>

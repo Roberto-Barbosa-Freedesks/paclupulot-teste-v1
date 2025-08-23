@@ -163,19 +163,17 @@ var DEBUG = false;
 /* Sound handlers added by Dr James Freeman who was sad such a great reverse was a silent movie  */
 
 var audio = new preloadAudio();
-try {
-  window.__paclupuloAudio = audio;
-  window.dispatchEvent(new Event("gameaudio-ready"));
-} catch(e) {}
+try { window.__paclupuloAudio = audio; window.dispatchEvent(new Event('gameaudio-ready')); } catch(e) {}
+
+try { window.__paclupuloAudio = audio; window.dispatchEvent(new Event("gameaudio-ready")); } catch(e) {}
+
 
 function audioTrack(url, volume) {
     var audio = new Audio(url);
-    try {
-  audio.setAttribute("preload","auto");
-  audio.setAttribute("playsinline","");
-  audio.setAttribute("webkit-playsinline","");
-} catch(e) {}
     if (volume) audio.volume = volume;
+// PATCH: mobile inline flags
+    try { audio.setAttribute('preload','auto'); audio.setAttribute('playsinline',''); audio.setAttribute('webkit-playsinline',''); } catch(e) {}
+        try { audio.setAttribute("preload","auto"); audio.setAttribute("playsinline",""); audio.setAttribute("webkit-playsinline",""); } catch(e) {}
     audio.load();
     var looping = false;
     this.play = function(noResetTime) {
@@ -10022,7 +10020,7 @@ var preNewGameState = (function() {
 
     return {
         init: function() {
-            audio.startMusic.play();
+            audio.coffeeBreakMusic.startLoop();
             menu.enable();
             gameTitleState.init();
             map = undefined;
@@ -10673,6 +10671,7 @@ var readyState =  (function(){
 
     return {
         init: function() {
+            try{ audio.coffeeBreakMusic.stopLoop(); }catch(e){}
             audio.startMusic.play();
             var i;
             for (i=0; i<5; i++)
@@ -10711,14 +10710,14 @@ var readyNewState = newChildObject(readyState, {
 
         // increment level and ready the next map
         level++;
-        
+
         // Verifica se deve recuperar vida a cada 2 fases concluídas
         // Verifica se o nível atual é uma "fase de recuperação" (3, 5, 7, 9, etc.)
         // e se o jogador perdeu ao menos 1 vida (extraLives < 2, já que começamos com 3)
         if (level >= 3 && (level - 1) % 2 === 0 && extraLives < 2) {
             extraLives++; // Recupera 1 vida
         }
-        
+
         if (gameMode == GAME_PACMAN) {
             map = mapPacman;
         }
@@ -12972,6 +12971,18 @@ var vcr = (function() {
 //////////////////////////////////////////////////////////////////////////////////////
 // Entry Point
 
+
+// CHATGPT PATCH: expose pause/resume for PONTOS overlay
+try {
+  window.paclupuloPauseGame = function(){
+    try { if (typeof showMainMenu === 'function') showMainMenu(); } catch(e){}
+    try { if (typeof vcr !== 'undefined' && vcr && typeof vcr.onHudDisable === 'function') vcr.onHudDisable(); } catch(e){}
+  };
+  window.paclupuloResumeGame = function(){
+    try { if (typeof hideMainMenu === 'function') hideMainMenu(); } catch(e){}
+    try { if (typeof vcr !== 'undefined' && vcr && typeof vcr.onHudEnable === 'function') vcr.onHudEnable(); } catch(e){}
+  };
+} catch(e){}
 window.addEventListener("load", function() {
     loadHighScores();
     initRenderer();

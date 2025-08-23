@@ -131,7 +131,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 5) Função para abrir tela de pontos (ranking)
   function openScoreboardScreen() {
-    document.getElementById('pontos-screen').style.display = 'flex';
+    try{ if (typeof executive!=='undefined' && !executive.isPaused()) executive.togglePause(); }catch(e){}
+try{ if (window.audio && audio.silence) audio.silence(true); }catch(e){}
+document.getElementById('pontos-screen').style.display = 'flex';
 
     // Atualiza pontuação do usuário logado
     const user = firebase.auth().currentUser;
@@ -174,7 +176,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 6) Função para fechar tela de pontos
   function closeScoreboardScreen() {
-    document.getElementById('pontos-screen').style.display = 'none';
+    try{ if (typeof executive!=='undefined' && executive.isPaused()) executive.togglePause(); }catch(e){}
+document.getElementById('pontos-screen').style.display = 'none';
   }
 
   // 7) Listeners dos botões, SEM duplicidade!
