@@ -301,7 +301,7 @@ var getGameDescription = (function(){
             "ROBERTO BARBOSA, ADALGISA CARUSO",
             "",
             "DESIGN GRÁFICO:",
-            "GIAN PIETRO",
+            "FREEDESKS",
         ],
         [
             "CERVEJARIA CAMPINAS 2025",
@@ -313,7 +313,7 @@ var getGameDescription = (function(){
             "ROBERTO BARBOSA, ADALGISA CARUSO",
             "",
             "DESIGN GRÁFICO:",
-            "GIAN PIETRO",
+            "FREEDESKS",
         ],
         [
             "CERVEJARIA CAMPINAS 2025",
@@ -325,7 +325,7 @@ var getGameDescription = (function(){
             "ROBERTO BARBOSA, ADALGISA CARUSO",
             "",
             "DESIGN GRÁFICO:",
-            "GIAN PIETRO",
+            "FREEDESKS",
         ],
         [
             "CERVEJARIA CAMPINAS 2025",
@@ -337,7 +337,7 @@ var getGameDescription = (function(){
             "ROBERTO BARBOSA, ADALGISA CARUSO",
             "",
             "DESIGN GRÁFICO:",
-            "GIAN PIETRO",
+            "FREEDESKS",
         ],
     ];
 
@@ -3356,7 +3356,7 @@ var initRenderer = function(){
                 ctx.font = (tileSize-2) + "px ArcadeR";
                 ctx.textBaseline = "bottom";
                 ctx.textAlign = "right";
-                ctx.fillStyle = "#333";
+                ctx.fillStyle = "#c7b816";
                 ctx.fillText(Math.floor(executive.getFps())+" FPS", screenWidth, screenHeight);
             }
 
@@ -3962,7 +3962,7 @@ var initRenderer = function(){
                         bgCtx.moveTo(-s,s);
                         bgCtx.lineTo(s,-s);
                         bgCtx.lineWidth = 1;
-                        bgCtx.strokeStyle = "#777";
+                        bgCtx.strokeStyle = "#e3e1e1";
                         bgCtx.stroke();
                         */
 
@@ -4017,7 +4017,7 @@ var initRenderer = function(){
                         bgCtx.font = (tileSize-1) + "px ArcadeR";
                     }
                     bgCtx.textBaseline = "middle";
-                    bgCtx.fillStyle = "#777";
+                    bgCtx.fillStyle = "#e3e1e1";
                     bgCtx.textAlign = "left";
                     bgCtx.fillText(level,(numCols-2)*tileSize, (numRows-1)*tileSize);
                 }
@@ -4402,7 +4402,7 @@ var Button = function(x,y,w,h,onclick) {
     // icon attributes
     this.frame = 0;
 
-    this.borderBlurColor = "#333";
+    this.borderBlurColor = "#c7b816";
     this.borderFocusColor = "#EEE";
 
     this.isSelected = false;
@@ -4577,7 +4577,7 @@ Button.prototype = {
         // draw text
         if (this.msg) {
             ctx.font = this.font;
-            ctx.fillStyle = this.isSelected && this.onclick ? this.fontcolor : "#777";
+            ctx.fillStyle = this.isSelected && this.onclick ? this.fontcolor : "#e3e1e1";
             ctx.textBaseline = "middle";
             ctx.textAlign = "center";
             //ctx.fillText(this.msg, 2*tileSize+2*this.pad+this.x, this.y + this.h/2 + 1);
@@ -7545,27 +7545,27 @@ Actor.prototype.getStepSizeFromTable = (function(){
 
     // speed control table (from Jamey Pittman)
     var stepSizes = (
-                         // LEVEL 1
+                         // LEVELS 1-2
     "1111111111111111" + // pac-man (normal)
-    "0110110101101101" + // ghosts (normal)
+    "0101010110101011" + // ghosts (normal)
     "2111211121112111" + // pac-man (fright)
     "0110110101101101" + // ghosts (fright)
     "0101010101010101" + // ghosts (tunnel)
     "1111111111111111" + // elroy 1
     "1111111121111111" + // elroy 2
 
-                         // LEVELS 2-4
+                         // LEVELS 3-4
     "1111211111112111" + // pac-man (normal)
-    "0110110110110111" + // ghosts (normal)
+    "0110110101101101" + // ghosts (normal)
     "2111211121112111" + // pac-man (fright)
     "0110110110110111" + // ghosts (fright)
     "0110101011010101" + // ghosts (tunnel)
     "1111211111112111" + // elroy 1
     "1111211112111121" + // elroy 2
 
-                         // LEVELS 5-20
+                         // LEVELS 6-20
     "1121112111211121" + // pac-man (normal)
-    "1111211112111121" + // ghosts (normal)
+    "1111111110111111" + // ghosts (normal)
     "1121112111211121" + // pac-man (fright) (N/A for levels 17, 19 & 20)
     "0111011101110111" + // ghosts (fright)  (N/A for levels 17, 19 & 20)
     "0110110101101101" + // ghosts (tunnel)
@@ -7573,8 +7573,8 @@ Actor.prototype.getStepSizeFromTable = (function(){
     "1121121121121121" + // elroy 2
 
                          // LEVELS 21+
-    "1111211111112111" + // pac-man (normal)
-    "1111211112111121" + // ghosts (normal)
+    "1121112111211121" + // pac-man (normal)
+    "1111111112111111" + // ghosts (normal)
     "0000000000000000" + // pac-man (fright) N/A
     "0000000000000000" + // ghosts (fright)  N/A
     "0110110101101101" + // ghosts (tunnel)
@@ -7584,9 +7584,9 @@ Actor.prototype.getStepSizeFromTable = (function(){
     return function(level, pattern) {
         var entry;
         if (level < 1) return;
-        else if (level==1)                  entry = 0;
-        else if (level >= 2 && level <= 4)  entry = 1;
-        else if (level >= 5 && level <= 20) entry = 2;
+        else if (level >= 1 && level <= 2)                  entry = 0;
+        else if (level >= 3 && level <= 5)  entry = 1;
+        else if (level >= 6 && level <= 20) entry = 2;
         else if (level >= 21)               entry = 3;
         return stepSizes[entry*7*16 + pattern*16 + this.frames%16];
     };
@@ -9622,7 +9622,7 @@ var homeState = (function(){
         menu.disable();
     };
 
-    var menu = new Menu("ESCOLHA SEU ESTILO",2*tileSize,0*tileSize,mapWidth-4*tileSize,3*tileSize,tileSize,tileSize+"px ArcadeR", "#EEE");
+    var menu = new Menu("ESCOLHA SEU ESTILO",2*tileSize,0*tileSize,mapWidth-4*tileSize,3*tileSize,tileSize,tileSize+"px ArcadeR", "#c7b816");
     var getIconAnimFrame = function(frame) {
         frame = Math.floor(frame/3)+1;
         frame %= 4;
@@ -10568,31 +10568,31 @@ var aboutState = (function(){
         ctx.fillStyle = "#0FF";
         ctx.fillText("DEVELOPER", x,y);
         y += tileSize*2;
-        ctx.fillStyle = "#777";
-        ctx.fillText("SHAUN WILLIAMS", x,y);
+        ctx.fillStyle = "#e3e1e1";
+        ctx.fillText("ROBERTO BARBOSA", x,y);
 
         y += tileSize*4;
         ctx.fillStyle = "#0FF";
         ctx.fillText("REVERSE-ENGINEERS",x,y);
         y += tileSize*2;
-        ctx.fillStyle = "#777";
-        ctx.fillText("JAMEY PITTMAN",x,y);
+        ctx.fillStyle = "#e3e1e1";
+        ctx.fillText("ROBERTO BARBOSA",x,y);
         y += tileSize*2;
-        ctx.fillText("BART GRANTHAM",x,y);
+        ctx.fillText("ROBERTO BARBOSA",x,y);
 
         y += tileSize*4;
         ctx.fillStyle = "#FF0";
         ctx.fillText("PAC-MAN",x,y);
         y += tileSize*2;
-        ctx.fillStyle = "#777";
-        ctx.fillText("NAMCO",x,y);
+        ctx.fillStyle = "#e3e1e1";
+        ctx.fillText("CERVEJARIA CAMPINAS",x,y);
 
         y += tileSize*4;
         ctx.fillStyle = "#FF0";
         ctx.fillText("MS. PAC-MAN / CRAZY OTTO",x,y);
         y += tileSize*2;
-        ctx.fillStyle = "#777";
-        ctx.fillText("GENERAL COMPUTING",x,y);
+        ctx.fillStyle = "#e3e1e1";
+        ctx.fillText("CERVEJARIA CAMPINAS",x,y);
     };
 
     return {
