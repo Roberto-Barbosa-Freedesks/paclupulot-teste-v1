@@ -1192,9 +1192,7 @@
         function handleStartClick() {
           // Toca a música de fundo se ainda não estiver tocando
           if (bgMusic.paused) {
-            bgMusic.play().catch(function (err) {
-              console.warn("Falha ao iniciar música automaticamente:", err);
-            });
+            try { window.dispatchEvent(new Event('gameaudio-prime-request')); } catch(e) {}
           }
           window.dispatchEvent(new Event('game:cleanup'));
           // Esconde a tela de start
@@ -1492,7 +1490,7 @@
 
 
 // (Patched) Em mobile, silencia faixas ativas ao abrir PONTOS (evita SFX tocando durante a pausa real)
-try { if (isMobile && window.audio && audio.silence) audio.silence(true); } catch(e) {}console.log("📱 Device type:", isMobile ? 'Mobile' : 'Desktop');
+console.log("📱 Device type:", isMobile ? 'Mobile' : 'Desktop');
         console.log("📱 Screen width:", window.innerWidth);
 
         // Fetch user stats com lógica mobile aprimorada
@@ -1824,7 +1822,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function __pp_handleStartClick() {
       try {
         if (bgMusic && bgMusic.paused) {
-          bgMusic.play().catch(function (err) { console.warn("Falha ao iniciar música:", err); });
+          try { window.dispatchEvent(new Event('gameaudio-prime-request')); } catch(e) {}
         }
         window.dispatchEvent(new Event('game:cleanup'));
         if (startScreen) startScreen.style.display = "none";
