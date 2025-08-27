@@ -2,6 +2,20 @@
 
 // 1) CONFIRMA que o DOM já está carregado antes de usar elementos (por via das dúvidas)
 document.addEventListener('DOMContentLoaded', () => {
+// === MOBILE AUDIO GUARD (não agressivo, só garante retomada em toques) ===
+(function mobileAudioGuard(){
+  try{
+    const bg = document.getElementById('bg-music');
+    // Retoma bg-music em qualquer toque/clique como gesto do usuário (iOS/Android)
+    function tryPlay(){ try{ if (bg && bg.paused) bg.play().catch(()=>{}); }catch(e){} }
+    document.addEventListener('pointerdown', tryPlay, { passive: true, capture: true });
+    document.addEventListener('touchend',   tryPlay, { passive: true, capture: true });
+    // Ao voltar de background/aba
+    window.addEventListener('focus',    tryPlay, { capture: true });
+    window.addEventListener('pageshow', tryPlay, { capture: true });
+  }catch(e){}
+})();
+
   // CHATGPT PATCH: CEP AutoFill via ViaCEP (readOnly/lock)
   (function setupCepAutofill(){
     const cepInput = document.getElementById('register-cep');
@@ -131,9 +145,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 5) Função para abrir tela de pontos (ranking)
   function openScoreboardScreen() {
-    try{ if (typeof executive!=='undefined' && !executive.isPaused()) executive.togglePause(); }catch(e){}
-try{ if (window.audio && audio.silence) audio.silence(true); }catch(e){}
-document.getElementById('pontos-screen').style.display = 'flex';
+  try{ if (window.__pointsOverlayOpen===true) return; }catch(e){}
+  try{ if (typeof executive!=='undefined' && !executive.isPaused()) executive.togglePause(); }catch(e){}
+  document.getElementById('pontos-screen').style.display = 'flex';
+  try{ window.__pointsOverlayOpen = true; }catch(e){}
 
     // Atualiza pontuação do usuário logado
     const user = firebase.auth().currentUser;
@@ -176,9 +191,11 @@ document.getElementById('pontos-screen').style.display = 'flex';
 
   // 6) Função para fechar tela de pontos
   function closeScoreboardScreen() {
-    try{ if (typeof executive!=='undefined' && executive.isPaused()) executive.togglePause(); }catch(e){}
-document.getElementById('pontos-screen').style.display = 'none';
-  }
+  try{ if (window.__pointsOverlayOpen===false) return; }catch(e){}
+  try{ if (typeof executive!=='undefined' && executive.isPaused()) executive.togglePause(); }catch(e){}
+  document.getElementById('pontos-screen').style.display = 'none';
+  try{ window.__pointsOverlayOpen = false; }catch(e){}
+}
 
   // 7) Listeners dos botões, SEM duplicidade!
   pontosButton.addEventListener('click', openScoreboardScreen);
