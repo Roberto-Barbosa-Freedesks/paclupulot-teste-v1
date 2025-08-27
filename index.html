@@ -1489,8 +1489,10 @@
         // Detecção mobile aprimorada
         const isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
                          (window.innerWidth <= 768 && 'ontouchstart' in window);
-        
-        console.log("📱 Device type:", isMobile ? 'Mobile' : 'Desktop');
+
+
+// (Patched) Em mobile, silencia faixas ativas ao abrir PONTOS (evita SFX tocando durante a pausa real)
+try { if (isMobile && window.audio && audio.silence) audio.silence(true); } catch(e) {}console.log("📱 Device type:", isMobile ? 'Mobile' : 'Desktop');
         console.log("📱 Screen width:", window.innerWidth);
 
         // Fetch user stats com lógica mobile aprimorada
@@ -1507,11 +1509,11 @@
               const data = playerDoc.data();
               console.log("📊 User data fetched:", data);
               console.log("🔑 Data keys:", Object.keys(data));
-              
+
               // Lógica definitiva para estruturas de dados
               let pontuacaoAcumulada = 0;
               let pontuacaoMaxima = 0;
-              
+
               // Prioridade 1: Estrutura playersAvatares
               if (data.playersAvatares && typeof data.playersAvatares === 'object') {
                 const stats = data.playersAvatares;
@@ -1531,13 +1533,13 @@
                 pontuacaoMaxima = data.maxScore || data.highScore || data.bestScore || 0;
                 console.log("✅ Using fallback structure");
               }
-              
+
               console.log("📊 Final stats - Acumulada:", pontuacaoAcumulada, "Máxima:", pontuacaoMaxima);
-              
+
               // Atualiza interface com garantia de exibição
               pontuacaoAcumuladaSpan.textContent = pontuacaoAcumulada;
               pontuacaoMaximaSpan.textContent = pontuacaoMaxima;
-              
+
               // Log específico para mobile
               if (isMobile) {
                 console.log("📱 Mobile stats updated - Acumulada:", pontuacaoAcumuladaSpan.textContent, "Máxima:", pontuacaoMaximaSpan.textContent);
@@ -1575,13 +1577,13 @@
             rankingSnapshot.forEach((doc) => {
               const data = doc.data();
               const docId = doc.id;
-              
+
               // Ignora documentos de teste ou inválidos
               if (!data.nome || typeof data.nome !== 'string' || data.nome.trim() === '') {
                 console.log("🚫 Ignorando documento sem nome válido:", docId);
                 return;
               }
-              
+
               // Ignora nomes de teste conhecidos
               const nomeNormalizado = data.nome.trim().toUpperCase();
               const nomesIgnorados = ['NOVO', 'BETO', 'TEST', 'TESTE', 'ADMIN', 'DEBUG'];
@@ -1589,7 +1591,7 @@
                 console.log("🚫 Ignorando nome de teste:", data.nome);
                 return;
               }
-              
+
               // Extrai pontuação máxima com múltiplas tentativas
               let pontuacaoMaxima = 0;
               if (data.playersAvatares && typeof data.playersAvatares === 'object') {
@@ -1597,7 +1599,7 @@
               } else {
                 pontuacaoMaxima = data.pontuacaoMaxima || data.maxScore || data.highScore || data.bestScore || 0;
               }
-              
+
               // Só inclui jogadores com pontuação válida
               if (pontuacaoMaxima > 0 && pontuacaoMaxima < 1000000) { // Limite máximo razoável
                 players.push({
@@ -1630,7 +1632,7 @@
                 rankingItem.style.color = "#fff"; // Cor branca padrão
                 rankingItem.textContent = `${index + 1}. ${player.nome} - ${player.pontuacaoMaxima} pts`;
                 rankingListDiv.appendChild(rankingItem);
-                
+
                 console.log(`🏆 ${index + 1}. ${player.nome} - ${player.pontuacaoMaxima} pts`);
               });
             }
@@ -1647,7 +1649,10 @@
       });
 
       backToGameButton.addEventListener("click", function () {
-        try { window.__pointsOverlayOpen = false; } catch(e){}
+        try { window.__pointsOverlayOpen = false; }
+// (Patched) Ao voltar ao jogo: prime o áudio e reavalia os loops de movimento
+try { window.dispatchEvent(new Event('gameaudio-prime-request')); } catch(e) {}
+try { if (window.ghosts && ghosts[0] && typeof ghosts[0].playSounds === 'function') ghosts[0].playSounds(); } catch(e) {} catch(e){}
 pontosScreen.style.display = "none";
         document.getElementById("canvas").style.display = "block";
         logoutButton.style.display = "block";

@@ -1,5 +1,5 @@
 /* sw.js - Offline/Cache control for Pac-Lúpulo (robust, versioned) */
-const CACHE_VERSION = 'v2025-08-21-a';
+const CACHE_VERSION = 'v2025-08-27-a';
 const STATIC_CACHE = 'static-' + CACHE_VERSION;
 
 const SAME_ORIGIN = self.location.origin;
