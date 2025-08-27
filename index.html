@@ -59,7 +59,7 @@
       
       /* Font stack otimizado para jogos arcade/retro */
       :root {
-        --primary-font: 'PressStart2P', 'Courier New', 'Monaco', 'Consolas', monospace;
+        --primary-font: 'PressStart2P', 'Roboto', 'Monaco', 'Consolas', monospace;
         --fallback-font: 'PressStart2P', monospace;
       }
       
@@ -1479,9 +1479,9 @@
 
       pontosButton.addEventListener("click", async function () {
         // Pausa o jogo e áudios como no botão MENU
-        try { window.paclupuloPauseGame && window.paclupuloPauseGame(); } catch(e){}
-        try { window.__paclupuloAudio && window.__paclupuloAudio.silence && window.__paclupuloAudio.silence(true); } catch(e){}
-pontosScreen.style.display = "flex";
+        try { window.dispatchEvent(new Event('gameaudio-prime-request')); } catch(e){}
+        try { window.__pointsOverlayOpen = true; } catch(e){}
+        pontosScreen.style.display = "flex";
         document.getElementById("canvas").style.display = "none";
         logoutButton.style.display = "none";
         pontosButton.style.display = "none";
@@ -1647,7 +1647,7 @@ pontosScreen.style.display = "flex";
       });
 
       backToGameButton.addEventListener("click", function () {
-        try { window.paclupuloResumeGame && window.paclupuloResumeGame(); } catch(e){}
+        try { window.__pointsOverlayOpen = false; } catch(e){}
 pontosScreen.style.display = "none";
         document.getElementById("canvas").style.display = "block";
         logoutButton.style.display = "block";

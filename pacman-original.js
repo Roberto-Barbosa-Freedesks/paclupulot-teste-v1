@@ -9474,7 +9474,7 @@ var executive = (function(){
         gameTime = Math.max(gameTime, now-maxFrameSkip*framePeriod);
 
         // Prevent any updates from being called when paused.
-        if (paused || inGameMenu.isOpen()) {
+        if (paused || inGameMenu.isOpen() || (typeof window !== 'undefined' && window.__pointsOverlayOpen === true)) {
             gameTime = now;
         }
 
@@ -9544,6 +9544,16 @@ var state;
 var switchState = function(nextState,fadeDuration, continueUpdate1, continueUpdate2) {
     state = (fadeDuration) ? fadeNextState(state,nextState,fadeDuration,continueUpdate1, continueUpdate2) : nextState;
     audio.silence();
+    state.init();
+    if (executive.isPaused()) {
+        executive.togglePause();
+    }
+};
+
+var witchStateKeepAudio = function(nextState,fadeDuration, continueUpdate1, continueUpdate2) {
+    // Same as switchState, but **does not** call audio.silence().
+    state = (fadeDuration) ? fadeNextState(state,nextState,fadeDuration,continueUpdate1, continueUpdate2) : nextState;
+    // audio.silence(); // intentionally not called
     state.init();
     if (executive.isPaused()) {
         executive.togglePause();
