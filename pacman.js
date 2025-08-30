@@ -2,21 +2,39 @@
 
 // 1) CONFIRMA que o DOM já está carregado antes de usar elementos (por via das dúvidas)
 document.addEventListener('DOMContentLoaded', () => {
+try{ window.__useBgMusic = false; }catch(e){};
 // === MOBILE AUDIO GUARD (não agressivo, só garante retomada em toques) ===
 (function mobileAudioGuard(){
   try{
-    const bg = document.getElementById('bg-music');
-    // Retoma bg-music em qualquer toque/clique como gesto do usuário (iOS/Android)
-    function tryPlay(){ try{ if (bg && bg.paused) bg.play().catch(()=>{}); }catch(e){} }
-    document.addEventListener('pointerdown', tryPlay, { passive: true, capture: true });
-    document.addEventListener('touchend',   tryPlay, { passive: true, capture: true });
-    // Ao voltar de background/aba
-    window.addEventListener('focus',    tryPlay, { capture: true });
-    window.addEventListener('pageshow', tryPlay, { capture: true });
+    // Em mobile/iOS, apenas 'prima' a origem de áudio SEM tocar bg-music.
+    function prime(){ try{ window.dispatchEvent(new Event('gameaudio-prime-request')); }catch(e){} }
+    document.addEventListener('pointerdown', prime, { passive: true, capture: true });
+    document.addEventListener('touchend',   prime, { passive: true, capture: true });
+    window.addEventListener('focus',    prime, { capture: true });
+    window.addEventListener('pageshow', prime, { capture: true });
   }catch(e){}
 })();
+// --------------------------------------------------------------
+// Cleanup de Áudio centralizado
+window.addEventListener('game:cleanup', () => {
+  try {
+    const audioManager = window.__paclupuloAudio;
+    if (audioManager && typeof audioManager.silence === 'function') {
+      audioManager.silence();
+    }
+  } catch (err) {
+    console.warn('Erro ao silenciar sons do jogo:', err);
+  }
+  try {
+    const bgEl = document.getElementById('bg-music');
+    if (bgEl) { bgEl.pause(); bgEl.currentTime = 0; }
+  } catch (err) {
+    console.warn('Erro ao pausar bg-music:', err);
+  }
+});
 
-  // CHATGPT PATCH: CEP AutoFill via ViaCEP (readOnly/lock)
+
+// CHATGPT PATCH: CEP AutoFill via ViaCEP (readOnly/lock)
   (function setupCepAutofill(){
     const cepInput = document.getElementById('register-cep');
     const stateSel = document.getElementById('register-state');

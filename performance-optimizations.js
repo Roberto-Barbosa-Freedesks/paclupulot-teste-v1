@@ -55,10 +55,8 @@
                 const bg = document.getElementById('bg-music');
                 try { if (bg && !bg.paused) bg.pause(); } catch(e){}
             } else {
-                applyUPS(__preferredUPS || 60);
-                // tenta retomar música, se permitido
-                const bg = document.getElementById('bg-music');
-                try { if (bg && bg.paused) { bg.play().catch(()=>{}); } } catch(e){}
+applyUPS(__preferredUPS || 60);
+                // Não retome bg-music aqui. O gerenciador de áudio do jogo controla a música.
             }
         });
     }

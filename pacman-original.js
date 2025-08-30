@@ -170,7 +170,8 @@ try { window.__paclupuloAudio = audio; window.dispatchEvent(new Event("gameaudio
 
 function audioTrack(url, volume) {
     var audio = new Audio(url);
-    if (volume) audio.volume = volume;
+        this.audio = audio;
+if (volume) audio.volume = volume;
 // PATCH: mobile inline flags
     try { audio.setAttribute('preload','auto'); audio.setAttribute('playsinline',''); audio.setAttribute('webkit-playsinline',''); } catch(e) {}
         try { audio.setAttribute("preload","auto"); audio.setAttribute("playsinline",""); audio.setAttribute("webkit-playsinline",""); } catch(e) {}
