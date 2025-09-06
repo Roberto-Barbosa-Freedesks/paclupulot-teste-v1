@@ -474,7 +474,13 @@
 
   </head>
 
-  <body>
+  
+<script>
+// [DEBUG_FLAGS]
+window.DEBUG_AUDIO = false;
+window.DEBUG_LEADERBOARD = false;
+</script>
+<body>
     <!-- Fonte custom para a classe ArcadeR -->
     <div style="font-family: &quot;ArcadeR&quot;"></div>
 
@@ -1601,27 +1607,34 @@ console.log("📱 Device type:", isMobile ? 'Mobile' : 'Desktop');
               // Só inclui jogadores com pontuação válida
               if (pontuacaoMaxima > 0 && pontuacaoMaxima < 1000000) { // Limite máximo razoável
                 players.push({
-                  nome: data.nome.trim(),
-                  pontuacaoMaxima: pontuacaoMaxima,
-                  docId: docId
-                });
-                console.log("✅ Jogador válido adicionado:", data.nome, "-", pontuacaoMaxima, "pts");
+  nome: data.nome.trim(),
+  pontuacaoMaxima: pontuacaoMaxima,
+  createdAtMillis: (data.createdAt && typeof data.createdAt.toMillis === 'function')
+    ? data.createdAt.toMillis()
+    : (data.createdAt ? (new Date(data.createdAt).getTime() || 0) : 0),
+  docId: docId
+});
+console.log("✅ Jogador válido adicionado:", data.nome, "-", pontuacaoMaxima, "pts");
               } else {
                 console.log("🚫 Ignorando jogador com pontuação inválida:", data.nome, "-", pontuacaoMaxima);
               }
             });
 
             // Sort by score descending and take top 100
-            players.sort((a, b) => b.pontuacaoMaxima - a.pontuacaoMaxima);
-            const top100 = players.slice(0, 100);
+            players.sort((a, b) => {
+  if (b.pontuacaoMaxima !== a.pontuacaoMaxima) return b.pontuacaoMaxima - a.pontuacaoMaxima;
+  if ((b.createdAtMillis || 0) !== (a.createdAtMillis || 0)) return (b.createdAtMillis || 0) - (a.createdAtMillis || 0);
+  return (a.docId || '').localeCompare(b.docId || '');
+});
+const top99 = players.slice(0, 99);
 
-            console.log("🏆 Top players found:", top100.length);
+            console.log("🏆 Top players found:", top99.length);
 
-            if (top100.length === 0) {
+            if (top99.length === 0) {
               rankingListDiv.innerHTML =
                 "<p style='font-size: 12px;'>Nenhum jogador com pontuação válida no ranking ainda.</p>";
             } else {
-              top100.forEach((player, index) => {
+              top99.forEach((player, index) => {
                 const rankingItem = document.createElement("p");
                 rankingItem.style.margin = "5px 0";
                 rankingItem.style.padding = "5px";
@@ -1822,7 +1835,16 @@ document.addEventListener("DOMContentLoaded", function () {
     function __pp_handleStartClick() {
       try {
         if (bgMusic && bgMusic.paused) {
-          try { window.dispatchEvent(new Event('gameaudio-prime-request')); } catch(e) {}
+          try { window.dispatchEvent(new Event('gameaudio-prime-request'));
+        if (window.primeGameAudio) { try { window.primeGameAudio(); } catch(e){} }
+        try {
+          if (bgMusic) {
+            bgMusic.muted = true;
+            bgMusic.play().then(() => { setTimeout(() => { try{ bgMusic.pause(); bgMusic.currentTime = 0; }catch(_){} bgMusic.muted = false; }, 0); }).catch(()=>{});
+          }
+        } catch(e){}
+      }
+catch(e) {}
         }
         window.dispatchEvent(new Event('game:cleanup'));
         if (startScreen) startScreen.style.display = "none";
@@ -1840,5 +1862,20 @@ document.addEventListener("DOMContentLoaded", function () {
   } catch(e){}
 });
 </script>
+
+<script>
+// [AUDIO_VISIBILITY] Retoma priming ao retornar e silencia ao ocultar
+document.addEventListener('visibilitychange', function(){
+  try {
+    if (!document.hidden) {
+      if (window.primeGameAudio) window.primeGameAudio();
+    } else {
+      const mgr = window.__paclupuloAudio;
+      if (mgr && typeof mgr.silence === 'function') mgr.silence(true);
+    }
+  } catch(e) { console.warn('[AUDIO_VISIBILITY]', e); }
+}, { capture: true });
+</script>
+
 </body>
 </html>
