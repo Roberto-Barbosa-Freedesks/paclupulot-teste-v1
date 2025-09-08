@@ -1,127 +1,173 @@
-// audio-unlock.js — Desbloqueio robusto e NÃO intrusivo de áudio (iOS/Android/Desktop)
+// [AUDIO_INIT] Global Audio Manager for Mobile Unlock (iOS/Android/Safari/Chrome)
 (function(){
-  'use strict';
+  if (window.__paclupuloAudio) return; // don't recreate
 
-  var PRIMED = false;
-  var PRIMING = false;
+  const DEBUG_AUDIO = !!window.DEBUG_AUDIO;
 
-  function silentUnlock(){
-    if (PRIMED || PRIMING) return;
-    PRIMING = true;
+  function log(){ if (DEBUG_AUDIO) try{ console.log.apply(console, ["[AUDIO]", ...arguments]); }catch(e){} }
+  function warn(){ if (DEBUG_AUDIO) try{ console.warn.apply(console, ["[AUDIO]", ...arguments]); }catch(e){} }
+
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  let ctx = null;
+  let masterGain = null;
+  let bgmSource = null;
+  let unlocked = false;
+  let htmlAudio = null; // Fallback unlock via <audio> for iOS HTMLAudio policies
+
+  function ensureContext(){
+    if (!Ctx) { warn("AudioContext not supported, relying on HTMLAudio unlock only."); return null; }
+    if (!ctx){
+      ctx = new Ctx({ latencyHint: "interactive" });
+      masterGain = ctx.createGain();
+      masterGain.gain.value = 1.0;
+      masterGain.connect(ctx.destination);
+      log("AudioContext created.");
+    }
+    return ctx;
+  }
+
+  async function silentPrimeWebAudio(){
     try {
-      // Reproduz um áudio silencioso 1x para liberar a origem (iOS/Android)
-      var a = document.createElement('audio');
-      // data URI de 0.05s de silêncio PCM → mp3 (curta, inaudível)
-      a.src = "data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-      a.setAttribute('playsinline','');
-      a.setAttribute('webkit-playsinline','');
-      a.muted = true;
-      a.volume = 0.0;
-      var done = function(){
-        try{ a.pause(); }catch(e){}
-        PRIMED = true; PRIMING = false;
-        try{ window.dispatchEvent(new Event('gameaudio-primed')); }catch(e){}
-      };
-      var p = a.play();
-      if (p && typeof p.then === 'function') {
-        p.then(done).catch(function(){ PRIMED = true; PRIMING = false; });
-      } else {
-        // navegadores antigos
-        setTimeout(done, 50);
-      }
-    } catch(e){
-      PRIMED = true; PRIMING = false;
+      const ac = ensureContext();
+      if (!ac) return true;
+      if (ac.state === "suspended") { await ac.resume(); }
+      // Play an ultra-short silent buffer to unlock
+      const buf = ac.createBuffer(1, 1, ac.sampleRate);
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.connect(masterGain);
+      src.start(0);
+      log("Silent buffer played for unlock.");
+      return true;
+    } catch (e){
+      warn("silentPrimeWebAudio error:", e);
+      return false;
     }
   }
 
-  function bindOnce(){
-    if (PRIMED) return;
-    ['pointerdown','touchstart','mousedown','keydown'].forEach(function(ev){
-      window.addEventListener(ev, silentUnlock, { once: true, capture: true, passive: true });
-    });
-    window.addEventListener('gameaudio-prime-request', silentUnlock, { capture: true });
-    window.addEventListener('gameaudio-ready', silentUnlock, { capture: true });
-    window.addEventListener('focus', silentUnlock, { capture: true });
-    window.addEventListener('pageshow', silentUnlock, { capture: true });
-    document.addEventListener('visibilitychange', function(){
-      if (!document.hidden) silentUnlock();
-    }, { capture: true });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bindOnce, { once: true });
-  } else {
-    bindOnce();
-  }
-})();
-
-// === Pac‑Lúpulo: priming dos sons reais do jogo (HTMLAudio) ===
-(function(){
-  var GAME_AUDIO_PRIMED = false;
-
-  function primeGameAudio(){
-    if (GAME_AUDIO_PRIMED) return;
-
+  async function silentPrimeHTMLAudio(){
     try {
-      var mgr = (typeof window !== 'undefined') ? window.__paclupuloAudio : null;
-      // Além disso, prime o <audio id="bg-music"> se existir
-      var bg = (typeof document !== 'undefined') ? document.getElementById('bg-music') : null;
-
-      // Se o gerenciador ainda não existe, tente novamente mais tarde
-      if (!mgr && !bg) return;
-
-      // Função para prime de um único elemento <audio>
-      function primeElement(el){
-        try {
-          if (!el) return;
-          // Play muted for unlock, then pause and reset
-          var prevMuted = el.muted;
-          el.muted = true;
-          var p = el.play();
-          if (p && p.catch) { p.catch(function(){}); }
-          // pause logo após o frame atual
-          setTimeout(function(){
-            try { el.pause(); } catch(e){}
-            try { el.currentTime = 0; } catch(e){}
-            el.muted = prevMuted;
-          }, 0);
-        } catch (e) {}
+      if (!htmlAudio){
+        htmlAudio = document.createElement("audio");
+        htmlAudio.setAttribute("preload", "auto");
+        htmlAudio.src = "data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQACcQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; // tiny silent mp3
       }
-
-      // Prime todos os sons do gerenciador
-      if (mgr && typeof mgr === 'object') {
-        try {
-          Object.keys(mgr).forEach(function(k){
-            try {
-              var t = mgr[k];
-              if (!t || !t.audio) return;
-              primeElement(t.audio);
-            } catch(e){}
-          });
-        } catch(e){}
-      }
-
-      // Prime também a trilha de fundo do <audio id="bg-music">
-      if (bg) primeElement(bg);
-
-      GAME_AUDIO_PRIMED = true;
-      try { window.__PAC_GAME_AUDIO_PRIMED__ = true; } catch(e){}
-    } catch (err) {}
+      await htmlAudio.play().catch(()=>{});
+      if (!htmlAudio.paused) { htmlAudio.pause(); htmlAudio.currentTime = 0; }
+      log("HTMLAudio silent prime attempted.");
+      return true;
+    } catch(e){
+      warn("silentPrimeHTMLAudio error:", e);
+      return false;
+    }
   }
 
-  // Executa o prime quando:
-  // 1) houver um gesto do usuário (disparado por pacman.js via 'gameaudio-prime-request')
-  // 2) quando o gerenciador de áudio estiver pronto ('gameaudio-ready')
-  // 3) ao voltar para a aba (pageshow/visibilitychange)
-  function primingEntryPoint(){
-    try { primeGameAudio(); } catch(e){}
+  async function unlockOnce(){
+    if (unlocked) return;
+    try{
+      await silentPrimeWebAudio();
+      await silentPrimeHTMLAudio();
+      unlocked = true;
+      window.removeEventListener("pointerdown", unlockOnce, true);
+      window.removeEventListener("touchstart", unlockOnce, true);
+      window.removeEventListener("click", unlockOnce, true);
+      log("Audio unlocked.");
+    }catch(e){ warn("unlockOnce failed", e); }
   }
 
-  window.addEventListener('gameaudio-prime-request', primingEntryPoint, { capture: true });
-  window.addEventListener('gameaudio-ready', primingEntryPoint, { capture: true });
-  window.addEventListener('pageshow', primingEntryPoint, { capture: true });
-  document.addEventListener('visibilitychange', function(){
-    if (!document.hidden) primingEntryPoint();
+  function attachUnlockers(){
+    // Use capture:true so we run before other handlers on buttons like "Iniciar"
+    window.addEventListener("pointerdown", unlockOnce, { passive: true, capture: true });
+    window.addEventListener("touchstart", unlockOnce, { passive: true, capture: true });
+    window.addEventListener("click", unlockOnce, { passive: true, capture: true });
+    // Custom hooks used by the game code
+    window.addEventListener("gameaudio-prime-request", unlockOnce, { capture: true });
+    log("Unlock listeners attached.");
+  }
+
+  // [AUDIO_PLAY] Central helpers (non-invasive: some legacy code may keep using HTMLAudio)
+  async function playSfx(buffer){
+    try{
+      const ac = ensureContext();
+      if (!ac) return;
+      if (ac.state === "suspended") await ac.resume();
+      const src = ac.createBufferSource();
+      src.buffer = buffer;
+      src.connect(masterGain);
+      src.start();
+      return true;
+    }catch(e){ warn("playSfx error:", e); return false; }
+  }
+
+  function setVolume(v){
+    try{ if (masterGain) masterGain.gain.value = Math.max(0, Math.min(1, v)); }catch(e){}
+  }
+
+  async function playBgm(url, options){
+    try{
+      const loop = options && options.loop === true;
+      const ac = ensureContext();
+      if (!ac) return;
+      if (ac.state === "suspended") await ac.resume();
+      if (bgmSource) { try{ bgmSource.stop(); }catch(_e){}; bgmSource.disconnect(); bgmSource = null; }
+      const resp = await fetch(url);
+      const arr = await resp.arrayBuffer();
+      const buf = await ac.decodeAudioData(arr);
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.loop = loop;
+      src.connect(masterGain);
+      src.start(0);
+      bgmSource = src;
+      log("BGM started", url, "loop:", loop);
+    }catch(e){ warn("playBgm error:", e); }
+  }
+
+  function stopBgm(){
+    if (bgmSource){ try{ bgmSource.stop(); }catch(e){}; bgmSource.disconnect(); bgmSource = null; }
+  }
+
+  function silence(mute){
+    if (masterGain) { masterGain.gain.value = mute ? 0 : 1; }
+  }
+
+  // [AUDIO_VISIBILITY] Resume on visibility/page events
+  document.addEventListener("visibilitychange", async function(){
+    try{
+      if (!document.hidden){
+        const ac = ensureContext();
+        if (ac && ac.state === "suspended") await ac.resume();
+        if (!unlocked) { await unlockOnce(); }
+        log("Visibility change -> resumed");
+      } else {
+        // optional: lower volume when hidden
+      }
+    }catch(e){ warn("visibilitychange error:", e); }
   }, { capture: true });
-})();
 
+  window.addEventListener("pageshow", async function(){
+    try{
+      const ac = ensureContext();
+      if (ac && ac.state === "suspended") await ac.resume();
+      if (!unlocked) await unlockOnce();
+    }catch(e){ warn("pageshow resume error:", e); }
+  }, { capture: true });
+
+  // Expose minimal API
+  window.__paclupuloAudio = {
+    get context(){ return ensureContext(); },
+    unlock: unlockOnce,
+    playSfx,
+    playBgm,
+    stopBgm,
+    silence,
+    setVolume,
+    _debugLog: log
+  };
+
+  // [AUDIO_UNLOCK] attach unlock routine
+  attachUnlockers();
+
+  // Export a convenience method the game already calls
+  window.primeGameAudio = unlockOnce;
+})();
