@@ -1,178 +1,203 @@
-// [LEADERBOARD_QUERY] & [LEADERBOARD_RENDER] Top 99 with scroll and robust detection
+// [LEADERBOARD_QUERY] & [LEADERBOARD_RENDER] – Top 99 com rolagem e auto-detecção Firebase
 (function(){
   const DEBUG = !!window.DEBUG_LEADERBOARD;
 
-  function log(){ if (DEBUG) try{ console.log.apply(console, ["[LEADERBOARD]", ...arguments]); }catch(e){} }
-  function warn(){ if (DEBUG) try{ console.warn.apply(console, ["[LEADERBOARD]", ...arguments]); }catch(e){} }
+  function log(){ if (DEBUG) try{ console.log('[LEADERBOARD]', ...arguments); }catch(e){} }
+  function warn(){ if (DEBUG) try{ console.warn('[LEADERBOARD]', ...arguments); }catch(e){} }
+
+  // [LEADERBOARD_STYLES] aplica CSS mínimo se não existir
+  (function ensureStyles(){
+    if (document.getElementById('leaderboard-styles')) return;
+    const css = `
+      #ranking-list{
+        max-height: 300px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      #ranking-list::-webkit-scrollbar{ width: 8px; }
+      #ranking-list::-webkit-scrollbar-thumb{ background: #f5d922; border-radius: 6px; }
+      #ranking-list::-webkit-scrollbar-track{ background: #333; }
+    `;
+    const st = document.createElement('style');
+    st.id = 'leaderboard-styles';
+    st.textContent = css;
+    document.head.appendChild(st);
+  })();
 
   function detectBackend(){
-    try {
+    try{
       if (window.firebase){
-        if (typeof firebase.firestore === "function" && firebase.firestore()) return "firestore";
-        if (typeof firebase.database === "function" && firebase.database()) return "realtime";
+        // compat v9 fornece API namespaced v8
+        if (typeof firebase.firestore === 'function' && firebase.firestore()) return 'firestore';
+        if (typeof firebase.database  === 'function' && firebase.database())  return 'realtime';
       }
-    } catch(e){}
-    return "unknown";
+    }catch(e){}
+    return 'unknown';
+  }
+
+  // helper para formatar data/hora simples
+  function fmt(ts){
+    try{
+      const d = ts instanceof Date ? ts : new Date(ts);
+      const pad = n => String(n).padStart(2,'0');
+      return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }catch(e){ return ''; }
+  }
+
+  // Consulta Firestore (namespaced compat ou modular detectado via presence)
+  async function queryFirestoreTop99(){
+    const db = firebase.firestore();
+    let q = db.collection('scores');
+    // Ordena por score desc e createdAt desc (desempate)
+    try{
+      q = q.orderBy('score', 'desc').orderBy('createdAt','desc').limit(99);
+    }catch(e){
+      warn('orderBy composto requer índice. Tentando apenas score desc.', e);
+      q = q.orderBy('score','desc').limit(99);
+    }
+    const snap = await q.get();
+    const arr = [];
+    snap.forEach(doc=>{
+      const v = doc.data() || {};
+      arr.push({
+        id: doc.id,
+        name: v.name || v.displayName || v.nickname || 'Jogador',
+        score: Number(v.score||0),
+        createdAt: v.createdAt && v.createdAt.toDate ? v.createdAt.toDate() : (v.createdAt || v.ts || v.timestamp || null)
+      });
+    });
+    // caso índice não permita createdAt, ainda garantimos estabilidade usando id/score
+    arr.sort((a,b)=>{
+      if (b.score !== a.score) return b.score - a.score;
+      const at = +new Date(a.createdAt||0), bt = +new Date(b.createdAt||0);
+      if (bt !== at) return bt - at;
+      return String(a.id).localeCompare(String(b.id));
+    });
+    return arr.slice(0,99);
+  }
+
+  // Consulta Realtime DB: pega os últimos 99 por score asc (limitToLast) e reordena desc
+  async function queryRealtimeTop99(){
+    const db = firebase.database();
+    const ref = db.ref('scores'); // ajusta conforme sua estrutura
+    const snap = await ref.orderByChild('score').limitToLast(99).once('value');
+    const arr = [];
+    snap.forEach(child=>{
+      const v = child.val() || {};
+      arr.push({
+        id: child.key,
+        name: v.name || v.displayName || v.nickname || 'Jogador',
+        score: Number(v.score||0),
+        createdAt: v.createdAt || v.ts || v.timestamp || null
+      });
+    });
+    arr.sort((a,b)=>{
+      if (b.score !== a.score) return b.score - a.score;
+      const at = +new Date(a.createdAt||0), bt = +new Date(b.createdAt||0);
+      if (bt !== at) return bt - at;
+      return String(a.id).localeCompare(String(b.id));
+    });
+    return arr;
   }
 
   async function fetchTop99(){
     const backend = detectBackend();
-    log("Backend detected:", backend);
-    if (backend === "firestore") return fetchTop99Firestore();
-    if (backend === "realtime")  return fetchTop99Realtime();
-    throw new Error("Firebase backend não detectado.");
-  }
-
-  function normalizePlayer(docId, data){
-    let score = 0;
-    if (data.playersAvatares && typeof data.playersAvatares === "object"){
-      score = data.playersAvatares.pontuacaoMaxima || 0;
-    } else {
-      score = data.pontuacaoMaxima || data.maxScore || data.highScore || data.bestScore || data.score || 0;
-    }
-    const createdAt = data.createdAt && typeof data.createdAt.toMillis === "function"
-        ? data.createdAt.toMillis()
-        : (data.createdAt ? (new Date(data.createdAt).getTime() || 0) : 0);
-
-    const name = (data.nome || data.name || data.displayName || "Jogador").toString().trim();
-    return { id: docId, name, score: Number(score)||0, createdAt: Number(createdAt)||0 };
-  }
-
-  async function fetchTop99Firestore(){
-    const db = firebase.firestore();
-    // Prefer server-side ordering + limit
-    try {
-      let q = db.collection("players").orderBy("pontuacaoMaxima", "desc");
-      // Secondary tie-breaker if available
-      try { q = q.orderBy("createdAt", "desc"); } catch(_e){ /* composed index may be missing; continue */ }
-      q = q.limit(99);
-      const snap = await q.get();
-      const out = [];
-      snap.forEach(doc => {
-        const d = doc.data() || {};
-        out.push(normalizePlayer(doc.id, d));
-      });
-      return out;
-    } catch (e){
-      warn("Firestore ordered query failed, falling back to client-side sort.", e);
-      // Fallback: fetch all and sort client-side (may be slower)
-      const snap = await db.collection("players").get();
-      const out = [];
-      snap.forEach(doc => out.push(normalizePlayer(doc.id, doc.data()||{})));
-      out.sort((a,b)=> (b.score - a.score) || (b.createdAt - a.createdAt) || (a.id<b.id?-1:1));
-      return out.slice(0, 99);
+    log('Backend detectado:', backend);
+    try{
+      if (backend === 'firestore') return await queryFirestoreTop99();
+      if (backend === 'realtime')  return await queryRealtimeTop99();
+      throw new Error('Firebase não detectado.');
+    }catch(e){
+      warn('Falha na consulta do leaderboard', e);
+      throw e;
     }
   }
 
-  async function fetchTop99Realtime(){
-    const db = firebase.database();
-    // Try common score fields
-    const paths = [
-      { key: "pontuacaoMaxima" },
-      { key: "score" }
-    ];
-    let data = null;
-    for (const p of paths){
-      try {
-        const ref = db.ref("players").orderByChild(p.key).limitToLast(99);
-        const snap = await ref.once("value");
-        data = snap.val();
-        if (data){ break; }
-      } catch(e){ warn("Realtime try failed for", p.key, e); }
-    }
-    const out = [];
-    if (data){
-      Object.keys(data).forEach(id => out.push(normalizePlayer(id, data[id]||{})));
-      out.sort((a,b)=> (b.score - a.score) || (b.createdAt - a.createdAt) || (a.id<b.id?-1:1));
-      return out.slice(0,99);
-    }
-    return out;
-  }
-
+  // [LEADERBOARD_RENDER]
   function render(list){
-    const container = document.getElementById("ranking-list");
-    if (!container){ warn("ranking-list container not found"); return; }
-    if (!Array.isArray(list) || list.length === 0){
-      container.innerHTML = "<p style='font-size:12px'>Sem dados de ranking no momento.</p>";
+    const container = document.getElementById('ranking-list');
+    if (!container) return;
+    if (!Array.isArray(list)) list = [];
+
+    // remove duplicados por id
+    const seen = new Set();
+    list = list.filter(it=>{
+      if (!it || !it.id) return false;
+      if (seen.has(it.id)) return false;
+      seen.add(it.id);
+      return true;
+    });
+
+    container.innerHTML = '';
+    if (!list.length){
+      container.innerHTML = `<div style="padding:12px;">Sem pontuações ainda. Jogue para entrar no ranking! 🏆</div>`;
       return;
     }
-    // Deduplicate by id/name+score combo to avoid duplicates
-    const seen = new Set();
-    const items = [];
-    for (const p of list){
-      const key = p.id + "|" + p.name + "|" + p.score;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      items.push(p);
-      if (items.length >= 99) break;
-    }
-    let html = "<ol style='list-style:none; margin:0; padding:0;'>";
-    let pos = 1;
-    for (const p of items){
-      const readableDate = p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "";
-      html += `
-        <li style="display:flex;align-items:center;justify-content:space-between;
-                   padding:8px 10px;border-bottom:1px solid #222;font-size:14px;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="width:28px;text-align:right;color:#888;">${pos}.</span>
-            <span style="font-weight:bold;color:#f5d922;">${(p.name||"Jogador").replace(/[<>]/g, "")}</span>
-          </div>
-          <div>
-            <span style="font-weight:bold;color:#FFD700;">${p.score} pts</span>
-            ${readableDate ? `<span style="color:#999;font-size:11px;margin-left:8px;">${readableDate}</span>` : ""}
-          </div>
-        </li>`;
-      pos++;
-    }
-    html += "</ol>";
-    container.innerHTML = html;
-    log("Rendered", items.length, "players.");
+
+    const ul = document.createElement('ul');
+    ul.style.listStyle = 'none';
+    ul.style.margin = '0';
+    ul.style.padding = '0';
+
+    list.forEach((it, idx)=>{
+      const li = document.createElement('li');
+      li.style.display = 'flex';
+      li.style.justifyContent = 'space-between';
+      li.style.alignItems = 'center';
+      li.style.padding = '8px 10px';
+      li.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
+      li.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:26px;text-align:right;">${idx+1}º</span>
+          <span style="font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            ${escapeHtml(it.name)}
+          </span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-weight:700;">${it.score}</span>
+          <span style="opacity:.7;font-size:11px;">${fmt(it.createdAt)}</span>
+        </div>
+      `;
+      ul.appendChild(li);
+    });
+
+    container.appendChild(ul);
   }
 
-  function ensureStyles(){
-    // [LEADERBOARD_STYLES] minimal safety if inline styles are missing
-    const css = `#ranking-list{max-height:300px;overflow-y:auto;scrollbar-width:thin}`;
-    const el = document.createElement("style");
-    el.setAttribute("data-leaderboard-styles","1");
-    el.textContent = css;
-    document.head.appendChild(el);
+  function escapeHtml(str){
+    return String(str||'').replace(/[&<>"']/g, s=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[s]);
   }
 
-  function attach(){
-    ensureStyles();
-    const btn = document.getElementById("pontos-button");
-    const back = document.getElementById("back-to-game-button");
-    const screen = document.getElementById("pontos-screen");
-
-    async function openV2(e){
-      if (e){ try{ e.preventDefault(); e.stopImmediatePropagation(); }catch(_e){} }
-      try{
-        if (screen) screen.style.display = "flex";
-        // prioritize our rendering
-        render([]);
-        const list = await fetchTop99();
-        render(list);
-      }catch(err){
-        warn("openV2 failed", err);
-        const container = document.getElementById("ranking-list");
-        if (container) container.innerHTML = "<p style='font-size:12px'>Ranking temporariamente indisponível.</p>";
+  async function loadAndRender(){
+    try{
+      const data = await fetchTop99();
+      log('Itens:', data.length);
+      render(data);
+    }catch(e){
+      const container = document.getElementById('ranking-list');
+      if (container){
+        container.innerHTML = `<div style="padding:12px;color:#f5d922;">Não foi possível carregar o ranking agora. Tente novamente mais tarde.</div>`;
       }
     }
-    if (btn){
-      // Capture-phase handler to override earlier listeners
-      btn.addEventListener("click", openV2, { capture: true });
-      btn.addEventListener("touchstart", openV2, { capture: true });
-    }
-    if (back){
-      back.addEventListener("click", function(){ if (screen) screen.style.display = "none"; }, { capture: true });
-      back.addEventListener("touchstart", function(){ if (screen) screen.style.display = "none"; }, { capture: true });
-    }
-    log("Leaderboard v2 attached.");
   }
 
-  if (document.readyState === "loading"){
-    document.addEventListener("DOMContentLoaded", attach);
+  // Atualiza quando a tela de pontos abrir (se houver botão)
+  function attachOpeners(){
+    const btn = document.getElementById('open-ranking-btn'); // se existir
+    if (btn){
+      const open = ()=>{ try{ loadAndRender(); }catch(_e){} };
+      btn.addEventListener('click', open, { capture:true });
+      btn.addEventListener('touchstart', open, { capture:true });
+    }
+    // fallback: carrega uma vez após DOM pronto
+    loadAndRender();
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', attachOpeners);
   } else {
-    attach();
+    attachOpeners();
   }
 })();

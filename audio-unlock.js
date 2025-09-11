@@ -1,173 +1,151 @@
-// [AUDIO_INIT] Global Audio Manager for Mobile Unlock (iOS/Android/Safari/Chrome)
+// [AUDIO_INIT] cria/reusa AudioContext + master gain (compat iOS/Android/Desktop)
 (function(){
-  if (window.__paclupuloAudio) return; // don't recreate
+  if (window.__paclupuloAudio) return;
 
   const DEBUG_AUDIO = !!window.DEBUG_AUDIO;
-
-  function log(){ if (DEBUG_AUDIO) try{ console.log.apply(console, ["[AUDIO]", ...arguments]); }catch(e){} }
-  function warn(){ if (DEBUG_AUDIO) try{ console.warn.apply(console, ["[AUDIO]", ...arguments]); }catch(e){} }
-
   const Ctx = window.AudioContext || window.webkitAudioContext;
+
+  function dlog(){ if (DEBUG_AUDIO) try{ console.log('[AUDIO]', ...arguments); }catch(e){} }
+  function dwarn(){ if (DEBUG_AUDIO) try{ console.warn('[AUDIO]', ...arguments); }catch(e){} }
+
   let ctx = null;
   let masterGain = null;
-  let bgmSource = null;
   let unlocked = false;
-  let htmlAudio = null; // Fallback unlock via <audio> for iOS HTMLAudio policies
+  let unlocking = false;
 
-  function ensureContext(){
-    if (!Ctx) { warn("AudioContext not supported, relying on HTMLAudio unlock only."); return null; }
-    if (!ctx){
-      ctx = new Ctx({ latencyHint: "interactive" });
+  // mantém referência para não coletar
+  let _silentBuf = null;
+
+  function ensureCtx(){
+    if (!ctx && Ctx){
+      ctx = new Ctx();
       masterGain = ctx.createGain();
       masterGain.gain.value = 1.0;
       masterGain.connect(ctx.destination);
-      log("AudioContext created.");
+      dlog('AudioContext criado.', ctx.state);
     }
     return ctx;
   }
 
-  async function silentPrimeWebAudio(){
-    try {
-      const ac = ensureContext();
-      if (!ac) return true;
-      if (ac.state === "suspended") { await ac.resume(); }
-      // Play an ultra-short silent buffer to unlock
-      const buf = ac.createBuffer(1, 1, ac.sampleRate);
-      const src = ac.createBufferSource();
+  // Cria um buffer silencioso curtíssimo (prime de iOS)
+  function createSilentBuffer(){
+    try{
+      const c = ensureCtx();
+      if (!c) return null;
+      const buf = c.createBuffer(1, 1, c.sampleRate);
+      const src = c.createBufferSource();
       src.buffer = buf;
       src.connect(masterGain);
-      src.start(0);
-      log("Silent buffer played for unlock.");
-      return true;
-    } catch (e){
-      warn("silentPrimeWebAudio error:", e);
-      return false;
+      _silentBuf = { src, when: c.currentTime };
+      return _silentBuf;
+    }catch(e){
+      dwarn('Falha ao criar silent buffer', e);
+      return null;
     }
   }
 
-  async function silentPrimeHTMLAudio(){
-    try {
-      if (!htmlAudio){
-        htmlAudio = document.createElement("audio");
-        htmlAudio.setAttribute("preload", "auto");
-        htmlAudio.src = "data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQACcQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; // tiny silent mp3
+  async function resumeCtx(){
+    try{
+      const c = ensureCtx();
+      if (!c) return false;
+      if (c.state === 'suspended' || c.state === 'interrupted'){
+        dlog('Tentando resume()...');
+        await c.resume();
       }
-      await htmlAudio.play().catch(()=>{});
-      if (!htmlAudio.paused) { htmlAudio.pause(); htmlAudio.currentTime = 0; }
-      log("HTMLAudio silent prime attempted.");
-      return true;
-    } catch(e){
-      warn("silentPrimeHTMLAudio error:", e);
+      dlog('Estado do contexto:', c.state);
+      return c.state === 'running';
+    }catch(e){
+      dwarn('resume falhou', e);
       return false;
     }
   }
 
+  // [AUDIO_UNLOCK] rotina de desbloqueio por gesto
   async function unlockOnce(){
-    if (unlocked) return;
+    if (unlocked || unlocking) return unlocked;
+    unlocking = true;
     try{
-      await silentPrimeWebAudio();
-      await silentPrimeHTMLAudio();
-      unlocked = true;
-      window.removeEventListener("pointerdown", unlockOnce, true);
-      window.removeEventListener("touchstart", unlockOnce, true);
-      window.removeEventListener("click", unlockOnce, true);
-      log("Audio unlocked.");
-    }catch(e){ warn("unlockOnce failed", e); }
-  }
-
-  function attachUnlockers(){
-    // Use capture:true so we run before other handlers on buttons like "Iniciar"
-    window.addEventListener("pointerdown", unlockOnce, { passive: true, capture: true });
-    window.addEventListener("touchstart", unlockOnce, { passive: true, capture: true });
-    window.addEventListener("click", unlockOnce, { passive: true, capture: true });
-    // Custom hooks used by the game code
-    window.addEventListener("gameaudio-prime-request", unlockOnce, { capture: true });
-    log("Unlock listeners attached.");
-  }
-
-  // [AUDIO_PLAY] Central helpers (non-invasive: some legacy code may keep using HTMLAudio)
-  async function playSfx(buffer){
-    try{
-      const ac = ensureContext();
-      if (!ac) return;
-      if (ac.state === "suspended") await ac.resume();
-      const src = ac.createBufferSource();
-      src.buffer = buffer;
-      src.connect(masterGain);
-      src.start();
-      return true;
-    }catch(e){ warn("playSfx error:", e); return false; }
-  }
-
-  function setVolume(v){
-    try{ if (masterGain) masterGain.gain.value = Math.max(0, Math.min(1, v)); }catch(e){}
-  }
-
-  async function playBgm(url, options){
-    try{
-      const loop = options && options.loop === true;
-      const ac = ensureContext();
-      if (!ac) return;
-      if (ac.state === "suspended") await ac.resume();
-      if (bgmSource) { try{ bgmSource.stop(); }catch(_e){}; bgmSource.disconnect(); bgmSource = null; }
-      const resp = await fetch(url);
-      const arr = await resp.arrayBuffer();
-      const buf = await ac.decodeAudioData(arr);
-      const src = ac.createBufferSource();
-      src.buffer = buf;
-      src.loop = loop;
-      src.connect(masterGain);
-      src.start(0);
-      bgmSource = src;
-      log("BGM started", url, "loop:", loop);
-    }catch(e){ warn("playBgm error:", e); }
-  }
-
-  function stopBgm(){
-    if (bgmSource){ try{ bgmSource.stop(); }catch(e){}; bgmSource.disconnect(); bgmSource = null; }
-  }
-
-  function silence(mute){
-    if (masterGain) { masterGain.gain.value = mute ? 0 : 1; }
-  }
-
-  // [AUDIO_VISIBILITY] Resume on visibility/page events
-  document.addEventListener("visibilitychange", async function(){
-    try{
-      if (!document.hidden){
-        const ac = ensureContext();
-        if (ac && ac.state === "suspended") await ac.resume();
-        if (!unlocked) { await unlockOnce(); }
-        log("Visibility change -> resumed");
-      } else {
-        // optional: lower volume when hidden
+      const ok = await resumeCtx();
+      // toca 1 frame silencioso para "fixar" o pipeline no iOS
+      const sb = createSilentBuffer();
+      if (sb && sb.src.start){
+        try{ sb.src.start(0); }catch(e){}
       }
-    }catch(e){ warn("visibilitychange error:", e); }
-  }, { capture: true });
+      unlocked = ok || true; // mesmo se resume reportar 'running' diferente, já criamos nós e tocamos silêncio
+      dlog('Audio desbloqueado?', unlocked);
+      window.dispatchEvent(new Event('audio:unlocked'));
+      return unlocked;
+    } catch(e){
+      dwarn('unlockOnce erro', e);
+      return false;
+    } finally {
+      unlocking = false;
+    }
+  }
 
-  window.addEventListener("pageshow", async function(){
+  // [AUDIO_PLAY] utilitários centralizados para SFX/BGM baseados em elementos <audio> existentes
+  // Mantemos compatibilidade: se o projeto usa <audio id="...">, apenas garante play() confiável.
+  async function playElementAudioById(id, {loop=false, volume=1.0}={}){
     try{
-      const ac = ensureContext();
-      if (ac && ac.state === "suspended") await ac.resume();
-      if (!unlocked) await unlockOnce();
-    }catch(e){ warn("pageshow resume error:", e); }
-  }, { capture: true });
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.loop = !!loop;
+      el.volume = Math.max(0, Math.min(1, volume));
+      if (el.muted) el.muted = false;
+      // alguns navegadores exigem load() antes do play após unlock
+      if (el.readyState < 2){
+        try{ el.load(); }catch(_){}
+      }
+      await el.play().catch(err => { if (DEBUG_AUDIO) console.warn('[AUDIO] play() catch', id, err); });
+    }catch(e){ dwarn('playElementAudioById', id, e); }
+  }
 
-  // Expose minimal API
+  async function pauseElementAudioById(id){
+    try{
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.pause();
+    }catch(e){ dwarn('pauseElementAudioById', id, e); }
+  }
+
+  // [AUDIO_VISIBILITY] retoma em visibilitychange/pageshow/focus
+  function attachVisibilityHandlers(){
+    function tryResume(){ unlockOnce(); }
+    document.addEventListener('visibilitychange', function(){
+      if (document.visibilityState === 'visible'){ tryResume(); }
+    }, { capture: true });
+    window.addEventListener('pageshow', tryResume, { capture: true });
+    window.addEventListener('focus', tryResume, { capture: true });
+  }
+
+  // Anexa listeners de primeiro gesto (pointerdown/touchstart/click)
+  function attachUnlockers(){
+    const handler = function(){
+      unlockOnce();
+      // remove após primeiro gesto
+      document.removeEventListener('pointerdown', handler, true);
+      document.removeEventListener('touchstart', handler, true);
+      document.removeEventListener('click', handler, true);
+    };
+    document.addEventListener('pointerdown', handler, { passive: true, capture: true });
+    document.addEventListener('touchstart', handler, { passive: true, capture: true });
+    document.addEventListener('click', handler, { passive: true, capture: true });
+    attachVisibilityHandlers();
+  }
+
+  // API pública mínima
   window.__paclupuloAudio = {
-    get context(){ return ensureContext(); },
+    ensureCtx,
     unlock: unlockOnce,
-    playSfx,
-    playBgm,
-    stopBgm,
-    silence,
-    setVolume,
-    _debugLog: log
+    playElementAudioById,
+    pauseElementAudioById
   };
 
-  // [AUDIO_UNLOCK] attach unlock routine
+  // Exporta atalho esperado por outros scripts
+  window.primeGameAudio = unlockOnce;
+
+  // inicia listeners
   attachUnlockers();
 
-  // Export a convenience method the game already calls
-  window.primeGameAudio = unlockOnce;
+  dlog('Audio manager carregado.');
 })();
