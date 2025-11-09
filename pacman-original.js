@@ -8941,13 +8941,20 @@ var energizer = (function() {
     var pointsDuration = 1;
 
     // how long to stay energized based on current level
-    var getDuration = (function(){
+    var BASE_FPS = 60;
+    var FRAME_MS = 1000/BASE_FPS;
+
+    var getDurationFrames = (function(){
         var seconds = [6,5,4,3,2,5,2,2,1,5,2,1,1,3,1,1,0,1];
         return function() {
             var i = level;
-            return (i > 18) ? 0 : 60*seconds[i-1];
+            return (i > 18) ? 0 : seconds[i-1]*BASE_FPS;
         };
     })();
+
+    var getDurationMs = function() {
+        return getDurationFrames()*FRAME_MS;
+    };
 
     // how many ghost flashes happen near the end of frightened mode based on current level
     var getFlashes = (function(){
@@ -8960,70 +8967,114 @@ var energizer = (function() {
 
     // "The ghosts change colors every 14 game cycles when they start 'flashing'" -Jamey Pittman
     var flashInterval = 14;
+    var flashIntervalMs = flashInterval*FRAME_MS;
 
-    var count;  // how long in frames energizer has been active
-    var active; // indicates if energizer is currently active
-    var points; // points that the last eaten ghost was worth
-    var pointsFramesLeft; // number of frames left to display points earned from eating ghost
+    var hasOwn = {}.hasOwnProperty;
 
-    var savedCount = {};
+    var nowMs = function() {
+        if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+            return performance.now();
+        }
+        return Date.now();
+    };
+
+    var elapsedMs = 0;  // how long in ms energizer has been active
+    var active = false;  // indicates if energizer is currently active
+    var points = 100;    // points that the last eaten ghost was worth
+    var pointsMsLeft = 0; // milliseconds left to display points earned from eating ghost
+    var lastTickMs = null;
+    var lastPointsTickMs = null;
+
+    var savedElapsedMs = {};
     var savedActive = {};
     var savedPoints = {};
-    var savedPointsFramesLeft = {};
+    var savedPointsMsLeft = {};
 
     // save state at time t
     var save = function(t) {
-        savedCount[t] = count;
+        savedElapsedMs[t] = elapsedMs;
         savedActive[t] = active;
         savedPoints[t] = points;
-        savedPointsFramesLeft[t] = pointsFramesLeft;
+        savedPointsMsLeft[t] = pointsMsLeft;
     };
 
     // load state at time t
     var load = function(t) {
-        count = savedCount[t];
-        active = savedActive[t];
-        points = savedPoints[t];
-        pointsFramesLeft = savedPointsFramesLeft[t];
+        elapsedMs = hasOwn.call(savedElapsedMs, t) ? savedElapsedMs[t] : 0;
+        active = hasOwn.call(savedActive, t) ? savedActive[t] : false;
+        points = hasOwn.call(savedPoints, t) ? savedPoints[t] : 100;
+        pointsMsLeft = hasOwn.call(savedPointsMsLeft, t) ? savedPointsMsLeft[t] : 0;
+        lastTickMs = nowMs();
+        lastPointsTickMs = lastTickMs;
     };
 
     return {
         save: save,
         load: load,
         reset: function() {
+            var i;
             audio.ghostTurnToBlue.stopLoop();
-            count = 0;
+            elapsedMs = 0;
             active = false;
             points = 100;
-            pointsFramesLeft = 0;
+            pointsMsLeft = 0;
+            lastTickMs = null;
+            lastPointsTickMs = null;
             for (i=0; i<4; i++)
                 ghosts[i].scared = false;
         },
         update: function() {
-            var i;
-            if (active) {
-                if (count == getDuration())
-                    this.reset();
-                else
-                    count++;
+            if (!active)
+                return;
+
+            var now = nowMs();
+            if (lastTickMs == null) {
+                lastTickMs = now;
+                return;
+            }
+
+            var delta = now - lastTickMs;
+            lastTickMs = now;
+
+            var durationMs = getDurationMs();
+            if (durationMs <= 0) {
+                this.reset();
+                return;
+            }
+
+            elapsedMs += delta;
+            if (elapsedMs >= durationMs) {
+                this.reset();
             }
         },
         activate: function() {
+            var i;
             audio.ghostNormalMove.stopLoop();
             audio.ghostTurnToBlue.startLoop();
             active = true;
-            count = 0;
+            elapsedMs = 0;
             points = 100;
+            lastTickMs = null;
+            lastPointsTickMs = null;
+            pointsMsLeft = 0;
             for (i=0; i<4; i++) {
                 ghosts[i].onEnergized();
             }
-            if (getDuration() == 0) { // if no duration, then immediately reset
+            if (getDurationMs() <= 0) { // if no duration, then immediately reset
                 this.reset();
             }
         },
         isActive: function() { return active; },
         isFlash: function() {
-            var i = Math.floor((getDuration()-count)/flashInterval);
+            if (!active)
+                return false;
+            var durationMs = getDurationMs();
+            if (durationMs <= 0 || flashIntervalMs <= 0)
+                return false;
+            var remaining = durationMs - elapsedMs;
+            if (remaining <= 0)
+                return false;
+            var i = Math.floor(remaining/flashIntervalMs);
             return (i<=2*getFlashes()-1) ? (i%2==0) : false;
         },
 
@@ -9032,10 +9083,21 @@ var energizer = (function() {
         },
         addPoints: function() {
             addScore(points*=2);
-            pointsFramesLeft = pointsDuration*60;
+            pointsMsLeft = pointsDuration*1000;
+            lastPointsTickMs = nowMs();
         },
-        showingPoints: function() { return pointsFramesLeft > 0; },
-        updatePointsTimer: function() { if (pointsFramesLeft > 0) pointsFramesLeft--; },
+        showingPoints: function() { return pointsMsLeft > 0; },
+        updatePointsTimer: function() {
+            if (pointsMsLeft <= 0)
+                return;
+            var now = nowMs();
+            if (lastPointsTickMs == null)
+                lastPointsTickMs = now;
+            var delta = now - lastPointsTickMs;
+            lastPointsTickMs = now;
+            pointsMsLeft = Math.max(0, pointsMsLeft - delta);
+            lastTickMs = now; // mantém o temporizador frightened pausado enquanto pontos são exibidos
+        },
     };
 })();
 //@line 1 "src/fruit.js"
