@@ -108,23 +108,16 @@
     atlas.drawMsPacmanSprite = atlas.drawPacmanSprite;
     atlas.drawCookiemanSprite = atlas.drawPacmanSprite;
 
-    // B. Mantenha os fantasmas com lúpulo
+    // B. Garante fantasmas frightened visíveis em qualquer dispositivo
     const originalDrawGhostSprite = atlas.drawGhostSprite;
     atlas.drawGhostSprite = function(ctx, x, y, frame, dirEnum, scared, isFlash, eyesOnly, color) {
-      if (scared) {
-        ensureCaches();
-        const ts = (typeof tileSize !== 'undefined' && tileSize) ? tileSize : 18;
-        const off = _cache.lupulo;
-        const size = Math.max(1, Math.round(ts*2));
-        const halfW = size / 2;
-        const halfH = size / 2;
-        ctx.save();
-        ctx.translate(Math.floor(x), Math.floor(y));
-        if (off) { ctx.drawImage(off.canvas, -halfW, -halfH); } else { ctx.drawImage(lupuloImage, -halfW, -halfH, size, size); }
-        ctx.restore();
-      } else {
-        originalDrawGhostSprite(ctx, x, y, frame, dirEnum, scared, isFlash, eyesOnly, color);
+      if (scared && !eyesOnly) {
+        // Mantém o sprite original "frightened" para garantir consistência visual
+        // nos dispositivos móveis (sem usar lupuloImage como substituto).
+        originalDrawGhostSprite(ctx, x, y, frame, dirEnum, true, isFlash, eyesOnly, color);
+        return;
       }
+      originalDrawGhostSprite(ctx, x, y, frame, dirEnum, scared, isFlash, eyesOnly, color);
     };
 
     // C. SUBSTITUIÇÃO CRÍTICA - Energizers por Canecas
