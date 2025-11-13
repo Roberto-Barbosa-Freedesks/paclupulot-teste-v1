@@ -1564,97 +1564,21 @@ console.log("📱 Device type:", isMobile ? 'Mobile' : 'Desktop');
           pontuacaoMaximaSpan.textContent = 0;
         }
 
-        // Fetch ranking com filtragem rigorosa
-        rankingListDiv.innerHTML = ""; // Clear previous ranking
-        console.log("🏆 Fetching ranking...");
+        // Fetch ranking usando módulo dedicado
+        if (rankingListDiv) {
+          rankingListDiv.innerHTML = "<p style='font-size: 12px;'>Carregando ranking...</p>";
+        }
         try {
-          // Get all players and sort client-side to avoid Firestore index requirements
-          const rankingSnapshot = await db.collection("players").get();
-
-          console.log("🏆 Ranking snapshot size:", rankingSnapshot.size);
-          if (rankingSnapshot.empty) {
-            rankingListDiv.innerHTML =
-              "<p style='font-size: 12px;'>Nenhum jogador no ranking ainda.</p>";
+          if (window.__paclupuloLeaderboard) {
+            await window.__paclupuloLeaderboard.refresh();
           } else {
-            // Filtragem rigorosa de dados válidos
-            const players = [];
-            rankingSnapshot.forEach((doc) => {
-              const data = doc.data();
-              const docId = doc.id;
-
-              // Ignora documentos de teste ou inválidos
-              if (!data.nome || typeof data.nome !== 'string' || data.nome.trim() === '') {
-                console.log("🚫 Ignorando documento sem nome válido:", docId);
-                return;
-              }
-
-              // Ignora nomes de teste conhecidos
-              const nomeNormalizado = data.nome.trim().toUpperCase();
-              const nomesIgnorados = ['NOVO', 'BETO', 'TEST', 'TESTE', 'ADMIN', 'DEBUG'];
-              if (nomesIgnorados.includes(nomeNormalizado)) {
-                console.log("🚫 Ignorando nome de teste:", data.nome);
-                return;
-              }
-
-              // Extrai pontuação máxima com múltiplas tentativas
-              let pontuacaoMaxima = 0;
-              if (data.playersAvatares && typeof data.playersAvatares === 'object') {
-                pontuacaoMaxima = data.playersAvatares.pontuacaoMaxima || 0;
-              } else {
-                pontuacaoMaxima = data.pontuacaoMaxima || data.maxScore || data.highScore || data.bestScore || 0;
-              }
-
-              // Só inclui jogadores com pontuação válida
-              if (pontuacaoMaxima > 0 && pontuacaoMaxima < 1000000) { // Limite máximo razoável
-                players.push({
-  nome: data.nome.trim(),
-  pontuacaoMaxima: pontuacaoMaxima,
-  createdAtMillis: (data.createdAt && typeof data.createdAt.toMillis === 'function')
-    ? data.createdAt.toMillis()
-    : (data.createdAt ? (new Date(data.createdAt).getTime() || 0) : 0),
-  docId: docId
-});
-console.log("✅ Jogador válido adicionado:", data.nome, "-", pontuacaoMaxima, "pts");
-              } else {
-                console.log("🚫 Ignorando jogador com pontuação inválida:", data.nome, "-", pontuacaoMaxima);
-              }
-            });
-
-            // Sort by score descending and take top 100
-            players.sort((a, b) => {
-  if (b.pontuacaoMaxima !== a.pontuacaoMaxima) return b.pontuacaoMaxima - a.pontuacaoMaxima;
-  if ((b.createdAtMillis || 0) !== (a.createdAtMillis || 0)) return (b.createdAtMillis || 0) - (a.createdAtMillis || 0);
-  return (a.docId || '').localeCompare(b.docId || '');
-});
-const top99 = players.slice(0, 99);
-
-            console.log("🏆 Top players found:", top99.length);
-
-            if (top99.length === 0) {
-              rankingListDiv.innerHTML =
-                "<p style='font-size: 12px;'>Nenhum jogador com pontuação válida no ranking ainda.</p>";
-            } else {
-              top99.forEach((player, index) => {
-                const rankingItem = document.createElement("p");
-                rankingItem.style.margin = "5px 0";
-                rankingItem.style.padding = "5px";
-                rankingItem.style.borderBottom = "1px solid #333";
-                rankingItem.style.fontSize = "12px";
-                rankingItem.style.color = "#fff"; // Cor branca padrão
-                rankingItem.textContent = `${index + 1}. ${player.nome} - ${player.pontuacaoMaxima} pts`;
-                rankingListDiv.appendChild(rankingItem);
-
-                console.log(`🏆 ${index + 1}. ${player.nome} - ${player.pontuacaoMaxima} pts`);
-              });
-            }
+            window.dispatchEvent(new Event('leaderboard:refresh'));
           }
         } catch (error) {
           console.error("Error fetching ranking:", error);
-          if (error.code === "permission-denied") {
+          if (rankingListDiv) {
             rankingListDiv.innerHTML =
-              "<p style='color: #f5d922; font-size: 12px;'>Ranking temporariamente indisponível. Configurando permissões...</p>";
-          } else {
-            rankingListDiv.innerHTML = "<p style='font-size: 12px;'>Erro ao carregar ranking.</p>";
+              "<p style='color: #f5d922; font-size: 12px;'>Ranking temporariamente indisponível.</p>";
           }
         }
       });
