@@ -130,14 +130,22 @@
     }, DPAD_HIDE_DELAY);
   }
 
+  function isElementVisible(element) {
+    if (!element) return false;
+    const style = window.getComputedStyle(element);
+    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+  }
+
   function showMobileControlsIfNeeded() {
     if (!isMobileDevice()) return;
     const controls = document.getElementById('mobile-controls');
     if (!controls) return;
 
+    const startScreen = document.getElementById('start-screen');
     const authScreen = document.getElementById('auth-screen');
     const pontosScreen = document.getElementById('pontos-screen');
-    const shouldShow = (!authScreen || authScreen.style.display === 'none') && (!pontosScreen || pontosScreen.style.display === 'none');
+
+    const shouldShow = !isElementVisible(startScreen) && !isElementVisible(authScreen) && !isElementVisible(pontosScreen);
 
     if (!shouldShow) {
       controls.style.display = 'none';
@@ -344,11 +352,15 @@
       showMobileControlsIfNeeded();
     });
 
+    const startScreen = document.getElementById('start-screen');
     const authScreen = document.getElementById('auth-screen');
     const pontosScreen = document.getElementById('pontos-screen');
 
-    if (authScreen) observer.observe(authScreen, { attributes: true });
-    if (pontosScreen) observer.observe(pontosScreen, { attributes: true });
+    const observerConfig = { attributes: true, attributeFilter: ['style', 'class'] };
+
+    if (startScreen) observer.observe(startScreen, observerConfig);
+    if (authScreen) observer.observe(authScreen, observerConfig);
+    if (pontosScreen) observer.observe(pontosScreen, observerConfig);
   }
 
   function initMobileControls() {
