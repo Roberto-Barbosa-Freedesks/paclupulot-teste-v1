@@ -70,8 +70,21 @@
   function attachLifecycle(){
     const tryResume = ()=> unlockOnce();
     document.addEventListener('visibilitychange', ()=>{
-      if (document.visibilityState === 'visible') tryResume();
+      if (document.visibilityState === 'visible') {
+        tryResume();
+      } else {
+        // se ocultar, força novo prime ao voltar
+        unlocked = false;
+        try{ if (ctx && ctx.state === 'running') ctx.suspend().catch(()=>{}); }catch(_e){}
+      }
     }, {capture:true});
+    const handlePageHide = ()=>{
+      unlocked = false;
+      try{
+        if (ctx && ctx.state === 'running'){ ctx.suspend().catch(()=>{}); }
+      }catch(_e){}
+    };
+    window.addEventListener('pagehide', handlePageHide, {capture:true});
     window.addEventListener('pageshow', tryResume, {capture:true});
     window.addEventListener('focus', tryResume, {capture:true});
   }
@@ -82,6 +95,7 @@
     ['pointerdown','touchstart','click','keydown'].forEach(evt=>{
       document.addEventListener(evt, handler, {capture:true, passive:true});
     });
+    window.addEventListener('gameaudio-prime-request', handler, {capture:true});
   }
 
   // Registrar elemento <audio> no grafo
@@ -175,6 +189,13 @@
         }
       }catch(e){ warn('silence erro', e); }
     }
+  };
+
+  api.playSfx = function(id, opts){
+    return api.playElementAudioById(id, Object.assign({channel:'sfx'}, opts));
+  };
+  api.playBgm = function(id, opts){
+    return api.playElementAudioById(id, Object.assign({channel:'bgm', loop:true}, opts));
   };
 
   window.__paclupuloAudioV2 = api;

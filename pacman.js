@@ -181,30 +181,22 @@ window.addEventListener('game:cleanup', () => {
     })
     .catch(err => console.error('Erro ao atualizar pontos:', err));
 
-    // Ajuste no ranking: apenas nomes de jogadores (sem símbolos, sem nomes duvidosos, sem score zero)
     const rankingList = document.getElementById('ranking-list');
-    rankingList.innerHTML = '<p>Carregando...</p>';
-    firebase.firestore().collection('players').orderBy('pontuacaoMaxima', 'desc').limit(50).get()
-      .then(snapshot => {
-        let html = '';
-        let pos = 1;
-        snapshot.forEach(doc => {
-          const d = doc.data();
-          // Filtro: só exibe nomes com pelo menos 2 palavras e sem caracteres inválidos/suspeitos
-          if (
-          typeof d.nome === 'string' &&
-          pos <= 10 &&
-          (d.pontuacaoMaxima ?? 0) > 0
-          ) {
-          html += `<div style="margin-bottom:4px;font-size:15px;"><strong>${pos}º</strong> ${d.nome.trim()} — <span style="color:#FFD700;">${d.pontuacaoMaxima} pts</span></div>`;
-          pos++;
-          }
-          });
-          rankingList.innerHTML = html;
-          })
-          .catch(() => {
-          rankingList.innerHTML = '<p>Erro ao carregar ranking.</p>';
-          });
+    if (rankingList){
+      rankingList.innerHTML = '<p style="font-size:12px;">Carregando ranking...</p>';
+    }
+    try{
+      if (window.__paclupuloLeaderboard){
+        window.__paclupuloLeaderboard.refresh();
+      } else {
+        window.dispatchEvent(new Event('leaderboard:refresh'));
+      }
+    }catch(err){
+      console.warn('Não foi possível atualizar o ranking (compat)', err);
+      if (rankingList){
+        rankingList.innerHTML = '<p style="font-size:12px;">Ranking temporariamente indisponível.</p>';
+      }
+    }
           }
 
   // 6) Função para fechar tela de pontos
